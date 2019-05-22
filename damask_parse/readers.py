@@ -6,8 +6,6 @@ import pandas
 import re
 import numpy as np
 
-from damask_parse.utils import resolve_dataframe_arrays
-
 __all__ = [
     'get_num_header_lines',
     'read_damask_table',
