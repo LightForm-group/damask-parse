@@ -34,6 +34,9 @@ setup(
         'numpy',
         'pandas'
     ],
+    project_urls={
+        'Github': 'https://github.com/LightForm-group/damask-parse',
+    },
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
