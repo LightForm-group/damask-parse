@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas
 
 from damask_parse.utils import resolve_dataframe_arrays
+from damask_parse._version import __version__
 
 
 def get_num_header_lines(path):
