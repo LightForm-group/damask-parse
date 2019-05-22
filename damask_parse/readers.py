@@ -108,7 +108,8 @@ def read_table(path, use_dataframe=False, combine_array_columns=True,
     if combine_array_columns:
         # Add arrays as single columns:
         for arr_name, arr_size in arr_sizes.items():
-            arr_idx = [f'{i}_{arr_name}' for i in range(1, arr_size + 1)]
+            arr_idx = ['{}_{}'.format(i, arr_name)
+                       for i in range(1, arr_size + 1)]
             df[arr_name] = df[arr_idx].values.tolist()
             # Remove individual array columns:
             df = df.drop(arr_idx, axis=1)

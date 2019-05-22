@@ -24,6 +24,8 @@ def zeropad(num, largest):
         on the left.
 
     """
-    num_digits = len(f'{largest:.0f}')
-    padded = f'{num:0{num_digits}}'
+
+    num_digits = len('{:.0f}'.format(largest))
+    padded = '{0:0{width}}'.format(num, width=num_digits)
+
     return padded
