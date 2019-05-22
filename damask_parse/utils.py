@@ -4,9 +4,6 @@
 def zeropad(num, largest):
     """Return a zero-padded string of a number, given the largest number.
 
-    TODO: replace f-strings with normal `format` function, since we want to
-    support Python 3.5.
-
     TODO: want to support floating-point numbers as well? Or rename function
     accordingly.
 
