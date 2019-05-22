@@ -1,4 +1,4 @@
-"""Pip installation script for `hpcflow`."""
+"""Pip installation script for `damask-parse`."""
 
 import os
 import re
