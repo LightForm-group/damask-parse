@@ -6,3 +6,4 @@ dependencies:
 - ipykernel
 - rope
 - autopep8
+- twine
