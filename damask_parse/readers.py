@@ -92,6 +92,9 @@ def read_table(path, use_dataframe=False, combine_array_columns=True,
         (if `use_dataframe` is True) or a dict of Numpy arrays (if
         `use_dataframe` if False).
 
+    TODO: parse all "array-like" columns in one-dimensional Numpy arrays, and
+    then reshape known columns into correct shapes.
+
     """
 
     arr_shape_lookup = {
