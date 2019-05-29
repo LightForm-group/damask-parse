@@ -8,6 +8,7 @@ import numpy as np
 
 __all__ = [
     'get_num_header_lines',
+    'get_header',
     'read_table',
 ]
 
