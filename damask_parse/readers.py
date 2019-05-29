@@ -6,6 +6,8 @@ import pandas
 import re
 import numpy as np
 
+from damask_parse.utils import get_header
+
 __all__ = [
     'read_table',
 ]
