@@ -7,59 +7,8 @@ import re
 import numpy as np
 
 __all__ = [
-    'get_num_header_lines',
-    'get_header',
     'read_table',
 ]
-
-
-def get_num_header_lines(path):
-    """Get the number of header lines from a file produced by DAMASK.
-
-    Parameters
-    ----------
-    path : str or Path
-        Path to a DAMASK-generated file that contains a header.
-
-    Returns
-    -------
-    num : int
-        Number of header lines in the DAMASK-generated file.
-
-    """
-
-    path = Path(path)
-    with path.open() as handle:
-        num = int(handle.read(1))
-
-    return num
-
-
-def get_header(path):
-    """Get the header from a file produced by DAMASK.
-
-    Parameters
-    ----------
-    path : str or Path
-        Path to a DAMASK-generated file that contains a header.
-
-    Returns
-    -------
-    header_lines : list
-        List of lines within the file header
-
-    """
-
-    num_header_lns = get_num_header_lines(path)
-
-    header_lines = []
-    path = Path(path)
-    with path.open() as handle:
-        for ln_idx, ln in enumerate(handle):
-            if ln_idx in range(1, num_header_lns + 1):
-                header_lines.append(ln.rstrip())
-
-    return header_lines
 
 
 def read_table(path, use_dataframe=False, combine_array_columns=True,
