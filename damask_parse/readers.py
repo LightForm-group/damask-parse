@@ -122,7 +122,11 @@ def read_table(path, use_dataframe=False, combine_array_columns=True,
 
     if not ignore_duplicate_cols:
         if np.any(df.columns.str.replace(r'(\.\d+)$', '').duplicated()):
-            msg = ('It appears there are duplicated columns in the table.')
+            msg = (
+                'It appears there are duplicated columns in the table. If you '
+                'want to ignore this fact, call the `read_table` function with'
+                ' the parameter `ignore_duplicate_cols=True`.'
+            )
             raise ValueError(msg)
 
     arr_sizes = None
