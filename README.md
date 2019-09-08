@@ -14,15 +14,15 @@ This is a work-in-progress. Currently, the only implemented function is to read 
 ### Readers:
 
 - ✅ `read_table`
-- ️❌ `read_geom`
+- ️✅ `read_geom`
 - ❌ `read_load`
 - ❌ `read_material`
 
 ### Writers:
 
-- ❌ `write_geom`
+- ✅ `write_geom`
 - ❌ `write_load`
-- ❌ `write_material`
+- ✅ `write_material_config`
 
 ### Utilities:
 

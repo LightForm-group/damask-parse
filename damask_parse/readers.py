@@ -10,6 +10,7 @@ from damask_parse.utils import get_header
 
 __all__ = [
     'read_table',
+    'read_geom',
 ]
 
 
@@ -134,3 +135,101 @@ def read_table(path, use_dataframe=False, combine_array_columns=True,
             outputs = arrays
 
     return outputs
+
+
+def read_geom(geom_path):
+    """Parse a DAMASK geometry file.
+
+    Parameters
+    ----------
+    geom_path : str or Path
+        Path to the DAMASK geometry file.
+
+    Returns
+    -------
+    volume_element : dict
+        Dictionary that represents the volume element parsed from the geometry
+        file, with keys:
+            grain_idx : ndarray of dimension three
+                A mapping that determines the grain index for each voxel.
+            orientations: ndarray of shape (N, 3)
+                Orientation of each grain in terms of three Euler angles.
+
+    Notes
+    -----
+    Expected format of the geometry file is, by line numbers:
+        1. The number of lines in the "header"
+        2. The Command invoked to generate this file and the version of that
+           command
+        3. Grid discretization resolution
+        4. RVE size
+        5. RVE origin
+        6. Homogenisation scheme?
+        7. Number of microstructures (i.e. grains?)
+        8. <microstructure> part, which specifies the crystallite and phase
+           indices from which each grain is constructed.
+        .. <texture> part, which specifies, for each grain, the orientation.
+    """
+
+    with geom_path.open() as handle:
+
+        micro_str = '<microstructure>'
+        texture_str = '<texture>'
+
+        grid_size = None
+        grain_idx_2d = None
+        micro_lns = []
+        texture_lns = []
+
+        num_header_lns = 0
+        parse = ''
+
+        for ln_idx, ln in enumerate(handle.readlines()):
+
+            ln_s = ln.strip()
+            ln_split = ln_s.split()
+
+            if ln_idx == 0:
+                num_header_lns = int(ln_split[0])
+
+            if ln_idx == 2:
+                grid_size = [int(ln_split[i]) for i in (2, 4, 6)]
+                grain_idx_2d = np.zeros((grid_size[1] * grid_size[2],
+                                         grid_size[0]), dtype=int)
+            if ln_idx > num_header_lns:
+                parse = 'grain_idx'
+            elif ln_s == micro_str:
+                parse = 'micro'
+                continue
+            elif ln_s == texture_str:
+                parse = 'texture'
+                # print('continuing...')
+                continue
+
+            if parse == 'micro':
+                micro_lns.append(ln_s)
+            elif parse == 'texture':
+                texture_lns.append(ln_s)
+            elif parse == 'grain_idx':
+                arr_idx = ln_idx - (num_header_lns + 1)
+                grain_idx_2d[arr_idx] = [int(i) for i in ln_split]
+
+    # Parse texture lines
+
+    # Don't need the section name lines e.g. "[Grain03]":
+    texture_lns = [i for idx, i in enumerate(texture_lns) if idx % 2 != 0]
+
+    # Assume using Euler angles (i.e. lines will start with "(guass)"):
+    orientations = np.array([
+        [float(j) for idx, j in enumerate(i.split()) if idx in [2, 4, 6]]
+        for i in texture_lns
+    ])
+
+    grain_idx = grain_idx_2d.reshape(grid_size[::-1]).swapaxes(0, 2)
+
+    volume_element = {
+        'grain_idx': grain_idx,
+        'orientations': orientations,
+    }
+
+    return volume_element
