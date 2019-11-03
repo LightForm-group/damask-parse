@@ -21,7 +21,7 @@ This is a work-in-progress. Currently, the only implemented function is to read 
 ### Writers:
 
 - ✅ `write_geom`
-- ❌ `write_load`
+- ✅ `write_load`
 - ✅ `write_material_config`
 
 ### Utilities:

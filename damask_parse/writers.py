@@ -60,7 +60,7 @@ def write_geom(volume_element, geom_path):
     arr_str = ''
     for row in grain_idx_2d:
         for col in row:
-            arr_str = '{:<5d}'.format(col)
+            arr_str += '{:<5d}'.format(col)
         arr_str += '\n'
 
     geom_path = Path(geom_path)
