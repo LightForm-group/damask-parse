@@ -278,22 +278,3 @@ def write_load_case(load_path, total_time, num_increments, def_grad_rate=None,
         handle.write(load_case_str)
 
     return load_path
-
-
-def write_damask_load_case(load_case, path):
-    """Write the load file for a DAMASK simulation."""
-
-    if 'f' in load_case:
-        out_str = f'f {load_case["f"]} '
-    elif 'fdot' in load_case:
-        out_str = f'fdot {load_case["fdot"]} '
-
-    out_str += (
-        f'p {load_case["p"]} '
-        f'time {load_case["time"]} '
-        f'incs {load_case["incs"]} '
-    )
-
-    with path.open('w') as handle:
-        handle.write(out_str)
-        handle.write('\n')
