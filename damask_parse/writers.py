@@ -4,11 +4,12 @@ from pathlib import Path
 
 import numpy as np
 
-from damask_parse.utils import zeropad
+from damask_parse.utils import zeropad, format_1D_masked_array
 
 __all__ = [
     'write_geom',
     'write_material_config',
+    'write_load_case',
 ]
 
 
@@ -191,3 +192,108 @@ def write_material_config(material, dir_path, volume_element=None, part_paths=No
                 handle.write(tex_spec)
 
     return path
+
+
+def write_load_case(load_path, total_time, num_increments, def_grad_rate=None,
+                    def_grad_aim=None, stress=None):
+    """
+
+    Example load case line is: 
+        fdot 1.0e-3 0 0  0 * 0  0 0 * stress * * *  * 0 *   * * 0  time 10  incs 40
+
+    """
+    if def_grad_aim is not None and def_grad_rate is not None:
+        msg = 'Specify only one of `def_grad_rate` and `def_grad_aim`.'
+        raise ValueError(msg)
+
+    stress_symbol = 'P'
+
+    # If def_grad_aim/rate is masked array, stress masked array should also be passed,
+    # such that the two arrays are component-wise exclusive.
+
+    dg_arr = None
+    dg_arr_sym = None
+    if def_grad_aim is not None:
+        dg_arr = def_grad_aim
+        dg_arr_sym = 'F'
+    elif def_grad_rate is not None:
+        dg_arr = def_grad_rate
+        dg_arr_sym = 'Fdot'
+
+    load_case_ln = []
+
+    if stress is None:
+
+        if dg_arr is None:
+            msg = 'Specify one of `def_grad_rate` or `def_grad_aim.'
+            raise ValueError(msg)
+
+        if isinstance(dg_arr, np.ma.core.MaskedArray):
+            msg = ('To use mixed boundary conditions, `stress` must be passed as a '
+                   'masked array.')
+            raise ValueError(msg)
+
+        dg_arr_fmt = format_1D_masked_array(dg_arr.flatten())
+        load_case_ln.append(dg_arr_sym + ' ' + dg_arr_fmt)
+
+    else:
+        if isinstance(stress, np.ma.core.MaskedArray):
+
+            if dg_arr is None:
+                msg = 'Specify one of `def_grad_rate` or `def_grad_aim.'
+                raise ValueError(msg)
+
+            msg = ('`def_grad_rate` or `def_grad_aim` must be component-wise exclusive '
+                   'with `stress` (both as masked arrays)')
+            if not isinstance(dg_arr, np.ma.core.MaskedArray):
+                raise ValueError(msg)
+            if np.any(dg_arr.mask == stress.mask):
+                raise ValueError(msg)
+
+            dg_arr_fmt = format_1D_masked_array(dg_arr.flatten(), fill_symbol='*')
+            stress_arr_fmt = format_1D_masked_array(stress.flatten(), fill_symbol='*')
+            load_case_ln.extend([
+                dg_arr_sym + ' ' + dg_arr_fmt,
+                stress_symbol + ' ' + stress_arr_fmt,
+            ])
+
+        else:
+            if dg_arr is not None:
+                msg = ('To use mixed boundary conditions, `stress` must be passed as a '
+                       'masked array.')
+                raise ValueError(msg)
+
+            stress_arr_fmt = format_1D_masked_array(stress.flatten())
+            load_case_ln.append(stress_symbol + ' ' + stress_arr_fmt)
+
+    load_case_ln.extend([
+        f'time {total_time}',
+        f'inc {num_increments}'
+    ])
+
+    load_case_str = ' '.join(load_case_ln)
+
+    load_path = Path(load_path)
+    with load_path.open('w') as handle:
+        handle.write(load_case_str)
+
+    return load_path
+
+
+def write_damask_load_case(load_case, path):
+    """Write the load file for a DAMASK simulation."""
+
+    if 'f' in load_case:
+        out_str = f'f {load_case["f"]} '
+    elif 'fdot' in load_case:
+        out_str = f'fdot {load_case["fdot"]} '
+
+    out_str += (
+        f'p {load_case["p"]} '
+        f'time {load_case["time"]} '
+        f'incs {load_case["incs"]} '
+    )
+
+    with path.open('w') as handle:
+        handle.write(out_str)
+        handle.write('\n')

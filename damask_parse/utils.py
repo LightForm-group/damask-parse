@@ -180,3 +180,17 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
                     return False
 
     return True
+
+
+def format_1D_masked_array(arr, fmt='{:g}', fill_symbol='*'):
+    'Also formats non-masked array.'
+
+    arr_fmt = ''
+    for idx, i in enumerate(arr):
+        if idx > 0:
+            arr_fmt += ' '
+        if isinstance(i, np.ma.core.MaskedConstant):
+            arr_fmt += '*'
+        else:
+            arr_fmt += fmt.format(i)
+    return arr_fmt
