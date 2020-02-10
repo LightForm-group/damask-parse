@@ -219,7 +219,7 @@ def read_geom(geom_path):
     # Don't need the section name lines e.g. "[Grain03]":
     texture_lns = [i for idx, i in enumerate(texture_lns) if idx % 2 != 0]
 
-    # Assume using Euler angles (i.e. lines will start with "(guass)"):
+    # Assume using Euler angles (i.e. lines will start with "(gauss)"):
     orientations = np.array([
         [float(j) for idx, j in enumerate(i.split()) if idx in [2, 4, 6]]
         for i in texture_lns
