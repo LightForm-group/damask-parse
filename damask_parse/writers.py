@@ -148,6 +148,7 @@ def write_material_config(material, dir_path, volume_element=None, part_paths=No
                 sec_name = section['name']
                 sec_keys = section.get('keys')
                 sec_outs = section.get('outputs')
+                sec_flags = section.get('flags')
 
                 handle.write(f'[{sec_name}]\n')
 
@@ -158,6 +159,12 @@ def write_material_config(material, dir_path, volume_element=None, part_paths=No
                 if sec_outs is not None:
                     for sec_out in sorted(sec_outs):
                         handle.write(f'{"(output)":<30s}{sec_out}\n')
+
+                if sec_flags is not None:
+                    for sec_flag in sorted(sec_flags):
+                        handle.write(f'/{sec_flag}/\n')
+
+                handle.write('\n')
 
             handle.write('\n')
 
