@@ -41,19 +41,24 @@ def write_geom(volume_element, geom_path):
     shape = grain_idx.shape
     grain_idx_2d = np.concatenate(grain_idx.swapaxes(0, 2))
     ve_size = volume_element.get('size', [1, 1, 1])
+    ve_origin = volume_element.get('origin', [0, 0, 0])
 
-    num_header_lns = 3
+    num_header_lns = 5
     homog_idx = 1
 
     header = (
         '{} header\n'
         'grid a {} b {} c {}\n'
         'size x {} y {} z {}\n'
+        'origin x {} y {} z {}\n'
+        'microstructures {}\n'
         'homogenization {}\n'
     ).format(
         num_header_lns,
         *shape,
         *ve_size,
+        *ve_origin,
+        np.max(grain_idx_2d),
         homog_idx
     )
 
