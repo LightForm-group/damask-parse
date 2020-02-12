@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.4] - 2020.02.12
+
+### Fixed
+
+- Add `orientations` key back to output from `read_geom`.
+
 ## [0.1.3] - 2020.02.12
 
 ### Added
