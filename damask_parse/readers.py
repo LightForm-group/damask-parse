@@ -204,6 +204,7 @@ def read_geom(geom_path):
         lines = handle.read()
 
         grains = {}
+        ori = None
         pat = r'\<microstructure\>[\s\S]*\(constituent\).*'
         ms_match = re.search(pat, lines)
         if ms_match:
@@ -220,6 +221,14 @@ def read_geom(geom_path):
                     grains[grain_idx] = tex
                 else:
                     grains[grain_idx].update(tex)
+
+            # Collect texture orientations into an array:
+            grain_keys = sorted(list(grains.keys()))
+            if not grain_keys == list(range(min(grain_keys), max(grain_keys) + 1)):
+                raise ValueError('Non-consecutive grain numbers.')
+            ori = np.zeros((len(grain_keys), 3))
+            for grain_idx, v in sorted(grains.items()):
+                ori[grain_idx - 1] = [v['phi1'], v['Phi'], v['phi2']]
 
         com_pat = r'(geom_.*)'
         commands = re.findall(com_pat, lines)
@@ -271,6 +280,7 @@ def read_geom(geom_path):
             'size': size,
             'origin': origin,
             'homogenization': homo,
+            'orientations': ori,
         }
 
     return volume_element
