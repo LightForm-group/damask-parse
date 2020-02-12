@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/damask-parse.svg)](https://badge.fury.io/py/damask-parse)
+
 # damask-parse
 Input file writers and output file readers for the crystal plasticity code DAMASK.
 
