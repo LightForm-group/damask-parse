@@ -1,6 +1,24 @@
 # Change Log
 
+## [0.1.3] - 2020.02.12
+
+### Added
+
+- Function `write_load_case`.
+
+### Changed
+
+- Function `read_geom` has been re-written using regular expression searches to be more robust.
+- Function `write_geom` now writes the `origin` and `microstructures` lines 
+- Function `write_material_config` supports boolean flags.
+
+### Fixed
+
+- Fixed bug in `write_geom`; geometry was not written correctly (only the first grain ID was written).
+
 ## [0.1.2] - 2019.09.08
+
+### Added
 
 - Added functions: `read_geom`, `write_geom`, `write_material_config`.
 
