@@ -11,6 +11,8 @@ from damask_parse.utils import get_header
 __all__ = [
     'read_table',
     'read_geom',
+    'read_spectral_stdout',
+    'read_spectral_stderr',
 ]
 
 
@@ -56,6 +58,122 @@ def parse_geom_texture(texture_str):
         grains.update({int(i[0]): grain})
 
     return grains
+
+
+def parse_increment_iteration(inc_iter_str):
+
+    float_pat = r'-?\d+\.\d+'
+    sci_float_pat = r'-?\d+\.\d+E[+|-]\d+'
+
+    dg_pat = r'deformation gradient aim\s+=\n(\s+(?:(?:' + float_pat + r'\s+){3}){3})'
+    dg_match = re.search(dg_pat, inc_iter_str)
+    dg_str = dg_match.group(1)
+    dg = np.array([float(i) for i in dg_str.split()]).reshape((3, 3))
+
+    pk_pat = r'Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:' + \
+        float_pat + r'\s+){3}){3})'
+    pk_match = re.search(pk_pat, inc_iter_str)
+    pk_str = pk_match.group(1)
+    pk = np.array([float(i) for i in pk_str.split()]).reshape((3, 3))
+
+    err_pat = r'error (.*)\s+=\s+(-?\d+\.\d+)\s\((' + sci_float_pat + \
+        r')\s(.*),\s+tol\s+=\s+(' + sci_float_pat + r')\)'
+    err_matches = re.findall(err_pat, inc_iter_str)
+    converge_err = {}
+    for i in err_matches:
+        err_key = 'error_' + i[0].strip().replace(' ', '_')
+        converge_err.update({
+            err_key: {
+                'value': float(i[2]),
+                'unit': i[3].strip(),
+                'tol': float(i[4]),
+                'relative': float(i[1]),
+            }
+        })
+
+    inc_iter = {
+        'deformation_gradient_aim': dg,
+        'piola_kirchhoff_stress': pk,
+        **converge_err,
+    }
+
+    return inc_iter
+
+
+def parse_increment(inc_str):
+
+    warn_msg = r'│\s+warning\s+│\s+│\s+(\d+)\s+│\s+├─+┤\s+│(.*)│\s+\s+│(.*)│'
+    warnings_matches = re.findall(warn_msg, inc_str)
+    warnings = [
+        {
+            'code': int(i[0]),
+            'message': i[1].strip() + ' ' + i[2].strip(),
+        } for i in warnings_matches
+    ]
+
+    if not re.search(r'increment\s\d+\sconverged', inc_str):
+        parsed_inc = {
+            'converged': False,
+            'warnings': warnings,
+        }
+        return parsed_inc
+
+    inc_position_pat = (r'Time\s+(\d+\.\d+E[+|-]\d+)s:\s+Increment'
+                        r'\s+(\d+\/\d+)-(\d+\/\d+)\s+of\sload\scase\s+(\d+)')
+    inc_pos = re.search(inc_position_pat, inc_str)
+    inc_pos_dat = inc_pos.groups()
+
+    inc_time = float(inc_pos_dat[0])
+    inc_number = int(inc_pos_dat[1].split('/')[0])
+    inc_cut_back = 1 / int(inc_pos_dat[2].split('/')[1])
+    inc_load_case = int(inc_pos_dat[3])
+
+    inc_iter_split_str = r'={75}'
+    inc_iter_split = re.split(inc_iter_split_str, inc_str)
+
+    dg_arr = []
+    pk_arr = []
+    converge_errors = None
+    err_keys = None
+    num_iters = len(inc_iter_split) - 1
+
+    for idx, i in enumerate(inc_iter_split[:-1]):
+
+        inc_iter_i = parse_increment_iteration(i)
+
+        if idx == 0:
+            err_keys = [j for j in inc_iter_i.keys() if j.startswith('error_')]
+            converge_errors = dict(
+                zip(err_keys, [{'value': [], 'tol': [], 'relative': []}
+                               for _ in err_keys])
+            )
+
+        dg_arr.append(inc_iter_i['deformation_gradient_aim'])
+        pk_arr.append(inc_iter_i['piola_kirchhoff_stress'])
+
+        for j in err_keys:
+            for k in ['value', 'tol', 'relative']:
+                converge_errors[j][k].append(inc_iter_i[j][k])
+
+    dg_arr = np.array(dg_arr)
+    pk_arr = np.array(pk_arr)
+    for j in err_keys:
+        for k in ['value', 'tol', 'relative']:
+            converge_errors[j][k] = np.array(converge_errors[j][k])
+
+    parsed_inc = {
+        'converged': True,
+        'inc_number': inc_number,
+        'inc_time': inc_time,
+        'inc_cut_back': inc_cut_back,
+        'inc_load_case': inc_load_case,
+        'deformation_gradient_aim': dg_arr,
+        'piola_kirchhoff_stress': pk_arr,
+        'num_iters': num_iters,
+        **converge_errors,
+    }
+
+    return parsed_inc
 
 
 def read_table(path, use_dataframe=False, combine_array_columns=True,
@@ -284,3 +402,90 @@ def read_geom(geom_path):
         }
 
     return volume_element
+
+
+def read_spectral_stdout(path):
+
+    path = Path(path)
+    inc_split_str = r'\s#{75}'
+
+    with path.open('r', encoding='utf8') as handle:
+        lines = handle.read()
+
+        inc_split = re.split(inc_split_str, lines)
+
+        dg_arr = []
+        pk_arr = []
+        inc_idx = []
+        inc_pos_dat = {
+            'inc_number': [],
+            'inc_time': [],
+            'inc_cut_back': [],
+            'inc_load_case': [],
+        }
+        err_keys = None
+        converge_errors = None
+        warnings = []
+
+        for idx, i in enumerate(inc_split[1:]):
+
+            parsed_inc = parse_increment(i)
+            if parsed_inc['converged']:
+
+                inc_idx.extend([idx] * parsed_inc['num_iters'])
+                if idx == 0:
+                    err_keys = [j for j in parsed_inc.keys() if j.startswith('error_')]
+                    converge_errors = dict(
+                        zip(err_keys, [{'value': [], 'tol': [], 'relative': []}
+                                       for _ in err_keys])
+                    )
+                dg_arr.extend(parsed_inc.pop('deformation_gradient_aim'))
+                pk_arr.extend(parsed_inc.pop('piola_kirchhoff_stress'))
+                for j in err_keys:
+                    for k in ['value', 'tol', 'relative']:
+                        converge_errors[j][k].extend(parsed_inc[j][k])
+
+                for k in ['inc_number', 'inc_time', 'inc_cut_back', 'inc_load_case']:
+                    inc_pos_dat[k].append(parsed_inc[k])
+
+            else:
+                warnings.extend(parsed_inc['warnings'])
+
+        inc_idx = np.array(inc_idx)
+        dg_arr = np.array(dg_arr)
+        pk_arr = np.array(pk_arr)
+        for j in err_keys:
+            for k in ['value', 'tol', 'relative']:
+                converge_errors[j][k] = np.array(converge_errors[j][k])
+
+        for k in ['inc_number', 'inc_time', 'inc_cut_back', 'inc_load_case']:
+            inc_pos_dat[k] = np.array(inc_pos_dat[k])
+
+        out = {
+            'deformation_gradient_aim': dg_arr,
+            'piola_kirchhoff_stress': pk_arr,
+            'increment_idx': inc_idx,
+            'warnings': warnings,
+            **converge_errors,
+            **inc_pos_dat
+        }
+
+    return out
+
+
+def read_spectral_stderr(path):
+
+    path = Path(path)
+
+    with path.open('r', encoding='utf8') as handle:
+        lines = handle.read()
+        errors_pat = r'│\s+error\s+│\s+│\s+(\d+)\s+│\s+├─+┤\s+│(.*)│\s+\s+│(.*)│'
+        matches = re.findall(errors_pat, lines)
+        errors = [
+            {
+                'code': int(i[0]),
+                'message': i[1].strip() + ' ' + i[2].strip(),
+            } for i in matches
+        ]
+
+        return errors
