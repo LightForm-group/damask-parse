@@ -17,6 +17,8 @@ This is a work-in-progress. Currently, the only implemented function is to read 
 
 - ✅ `read_table`
 - ️✅ `read_geom`
+- ✅ `read_spectral_stdout`
+- ✅ `read_spectral_stderr`
 - ❌ `read_load`
 - ❌ `read_material`
 

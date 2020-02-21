@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.5] - 2020.02.21
+
+### Added
+
+- Add `read_spectral_stdout` and `read_spectral_stderr` to read standard output and error streams from a `DAMASK_spectral` simulation.
+
 ## [0.1.4] - 2020.02.12
 
 ### Fixed
