@@ -221,6 +221,7 @@ def write_load_case(load_path, load_cases):
         def_grad_aim = load_case.get('def_grad_aim')
         def_grad_rate = load_case.get('def_grad_rate')
         stress = load_case.get('stress')
+        rot = load_case.get('rotation')
         total_time = load_case['total_time']
         num_increments = load_case['num_increments']
 
@@ -292,6 +293,18 @@ def write_load_case(load_path, load_cases):
             f't {total_time}',
             f'incs {num_increments}'
         ])
+
+        if rot is not None:
+
+            rot = np.array(rot)
+            msg = 'Matrix passed as a rotation is not a rotation matrix.'
+            if not np.allclose(rot.T @ rot, np.eye(3)):
+                raise ValueError(msg)
+            if not np.isclose(np.linalg.det(rot), 1):
+                raise ValueError(msg)
+
+            rot_fmt = format_1D_masked_array(rot.flatten())
+            load_case_ln.append(f'rot {rot_fmt}')
 
         load_case_str = ' '.join(load_case_ln)
         all_load_case.append(load_case_str)
