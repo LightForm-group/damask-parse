@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.6] - 2020.04.03
+
+### Changed
+
+- Enable adding a rotation to a load case in function `write_load_case`.
+
 ## [0.1.5] - 2020.02.21
 
 ### Added
