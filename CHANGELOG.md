@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.7] - 2020.04.03
+
+### Fixed
+
+- Write numbers to sufficient precision in `write_load_case`.
+
 ## [0.1.6] - 2020.04.03
 
 ### Changed
