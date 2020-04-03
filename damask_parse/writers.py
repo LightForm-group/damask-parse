@@ -256,7 +256,7 @@ def write_load_case(load_path, load_cases):
                        'masked array.')
                 raise ValueError(msg)
 
-            dg_arr_fmt = format_1D_masked_array(dg_arr.flatten())
+            dg_arr_fmt = format_1D_masked_array(dg_arr.flatten(), fmt='{:.10f}')
             load_case_ln.append(dg_arr_sym + ' ' + dg_arr_fmt)
 
         else:
@@ -273,8 +273,10 @@ def write_load_case(load_path, load_cases):
                 if np.any(dg_arr.mask == stress.mask):
                     raise ValueError(msg)
 
-                dg_arr_fmt = format_1D_masked_array(dg_arr.flatten(), fill_symbol='*')
-                stress_arr_fmt = format_1D_masked_array(stress.flatten(), fill_symbol='*')
+                dg_arr_fmt = format_1D_masked_array(
+                    dg_arr.flatten(), fill_symbol='*', fmt='{:.10f}')
+                stress_arr_fmt = format_1D_masked_array(
+                    stress.flatten(), fill_symbol='*', fmt='{:.10f}')
                 load_case_ln.extend([
                     dg_arr_sym + ' ' + dg_arr_fmt,
                     stress_symbol + ' ' + stress_arr_fmt,
@@ -286,7 +288,7 @@ def write_load_case(load_path, load_cases):
                            'masked array.')
                     raise ValueError(msg)
 
-                stress_arr_fmt = format_1D_masked_array(stress.flatten())
+                stress_arr_fmt = format_1D_masked_array(stress.flatten(), fmt='{:.10f}')
                 load_case_ln.append(stress_symbol + ' ' + stress_arr_fmt)
 
         load_case_ln.extend([
@@ -303,8 +305,8 @@ def write_load_case(load_path, load_cases):
             if not np.isclose(np.linalg.det(rot), 1):
                 raise ValueError(msg)
 
-            rot_fmt = format_1D_masked_array(rot.flatten())
-            load_case_ln.append(f'rot {rot_fmt}')
+        rot_fmt = format_1D_masked_array(rot.flatten(), fmt='{:.10f}')
+        load_case_ln.append(f'rot {rot_fmt}')
 
         load_case_str = ' '.join(load_case_ln)
         all_load_case.append(load_case_str)
