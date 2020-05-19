@@ -305,8 +305,8 @@ def write_load_case(load_path, load_cases):
             if not np.isclose(np.linalg.det(rot), 1):
                 raise ValueError(msg)
 
-        rot_fmt = format_1D_masked_array(rot.flatten(), fmt='{:.10f}')
-        load_case_ln.append(f'rot {rot_fmt}')
+            rot_fmt = format_1D_masked_array(rot.flatten(), fmt='{:.10f}')
+            load_case_ln.append(f'rot {rot_fmt}')
 
         load_case_str = ' '.join(load_case_ln)
         all_load_case.append(load_case_str)
