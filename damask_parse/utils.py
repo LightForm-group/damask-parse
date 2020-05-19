@@ -1,7 +1,9 @@
 """`damask_parse.utils.py`"""
 
 from pathlib import Path
+from subprocess import run, PIPE
 import copy
+import re
 
 import numpy as np
 
@@ -194,3 +196,23 @@ def format_1D_masked_array(arr, fmt='{:g}', fill_symbol='*'):
         else:
             arr_fmt += fmt.format(i)
     return arr_fmt
+
+
+def parse_damask_spectral_version_info():
+    'Parse the DAMASK version number and compiler options from `DAMASK_spectral --help`.'
+
+    proc = run(['DAMASK_spectral', '--help'], stdout=PIPE, stderr=PIPE)
+    stdout, stderr = proc.stdout.decode(), proc.stderr.decode()
+
+    ver_str = re.search('Version: (.*)', stdout).group(1).strip()
+    comp_with_str = re.search('Compiled with: (.*)', stdout).group(1).strip()
+    comp_opts_str = re.search('Compiler options: (.*)', stdout).group(1).strip()
+
+    damask_spectral_info = {
+        'version': ver_str,
+        'compiled_with': comp_with_str,
+        'compiler_options': comp_opts_str,
+        'stderr': stderr.strip(),
+    }
+
+    return damask_spectral_info
