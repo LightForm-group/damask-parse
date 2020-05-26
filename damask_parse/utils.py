@@ -198,10 +198,10 @@ def format_1D_masked_array(arr, fmt='{:g}', fill_symbol='*'):
     return arr_fmt
 
 
-def parse_damask_spectral_version_info():
+def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     'Parse the DAMASK version number and compiler options from `DAMASK_spectral --help`.'
 
-    proc = run(['DAMASK_spectral', '--help'], stdout=PIPE, stderr=PIPE)
+    proc = run(f'{executable} --help', stdout=PIPE, stderr=PIPE, shell=True)
     stdout, stderr = proc.stdout.decode(), proc.stderr.decode()
 
     ver_str = re.search('Version: (.*)', stdout).group(1).strip()
