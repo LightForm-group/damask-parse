@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.1.8] - 2020.06.09
+
+### Added
+
+- Add function `utils.parse_damask_spectral_version_info` to get DAMASK version.
+
+### Fixed
+
+- Fix incorrect indentation in `write_load_case`.
+
 ## [0.1.7] - 2020.04.03
 
 ### Fixed
