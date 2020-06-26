@@ -216,3 +216,38 @@ def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     }
 
     return damask_spectral_info
+
+
+def volume_element_from_2D_microstructure(microstructure_image, depth=1):
+    """Extrude a 2D microstructure by a given depth to form a 3D volume element.
+
+    Parameters
+    ----------
+    microstructure_image : dict
+        Dict with the following keys:
+            grains : ndarray of shape (N, M)
+                2D map of grain indices.
+            orientations : ndarray of shape (P, 3)
+                Euler angles for each grain.
+    depth : int, optional
+        By how many voxels the microstructure should be extruded. By default, 1.
+
+    Returns
+    -------
+    volume_element : dict
+        Dict with the following keys:
+            grain_idx : ndarray of shape (depth, N, M)
+            size: tuple of length three
+            orientations : ndarray of shape (P, 3)
+
+    """
+
+    grain_idx = microstructure_image['grains'][None]
+    grain_idx = np.tile(grain_idx, (depth, 1, 1))
+    volume_element = {
+        'grain_idx': grain_idx,
+        'size': grain_idx.shape,
+        'orientations': microstructure_image['orientations'],
+
+    }
+    return volume_element
