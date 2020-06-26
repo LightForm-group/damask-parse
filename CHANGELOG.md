@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.9] - 2020.06.26
+
+### Added 
+
+- Add function `utils.volume_element_from_2D_microstructure`.
+
 ## [0.1.8] - 2020.06.09
 
 ### Added
