@@ -218,7 +218,7 @@ def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     return damask_spectral_info
 
 
-def volume_element_from_2D_microstructure(microstructure_image, depth=1):
+def volume_element_from_2D_microstructure(microstructure_image, depth=1, image_axes=['y', 'x']):
     """Extrude a 2D microstructure by a given depth to form a 3D volume element.
 
     Parameters
@@ -241,9 +241,15 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1):
             orientations : ndarray of shape (P, 3)
 
     """
+    # parse image axis directions and add extrusion direction (all +ve only)
+    conv_axis = {'x': 0, 'y': 1, 'z': 2}
+    image_axes = [conv_axis[axis] for axis in image_axes]
+    image_axes.append(3 - sum(image_axes))
 
-    grain_idx = microstructure_image['grains'][None]
-    grain_idx = np.tile(grain_idx, (depth, 1, 1))
+    # extrude and then switch around the axes to x, y, z order
+    grain_idx = microstructure_image['grains'][:, :, np.newaxis]
+    grain_idx = np.tile(grain_idx, (1, 1, depth))
+    grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
     volume_element = {
         'grain_idx': grain_idx,
         'size': grain_idx.shape,
