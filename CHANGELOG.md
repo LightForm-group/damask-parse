@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.10] - 2020.07.28
+
+### Changed
+
+- Add `image_axes` argument to `utils.volume_element_from_2D_microstructure` function.
+
 ## [0.1.9] - 2020.06.26
 
 ### Added 
