@@ -20,10 +20,15 @@ def write_geom(volume_element, geom_path):
     ----------
     volume_element : dict
         Dict that represents the specification of a volume element, with keys:
-            grain_idx : nested list or ndarray of dimension three
+            voxel_grain_idx : nested list or 3D ndarray of int
                 A mapping that determines the grain index for each voxel.
+            voxel_homogenization_idx : nested list or 3D ndarray of int
+                A mapping that determines the homogenization scheme (via an integer index)
+                for each voxel. Currently, only one homogenization index is supported.
             size : list of length three, optional
-                Volume element size. By default set, to unit size: `[1, 1, 1]`.
+                Volume element size. By default set to unit size: [1, 1, 1].
+            origin : list of length three, optional
+                Volume element origin. By default: [0, 0, 0].
     geom_path : str or Path
         The path to the file that will be generated.
 
@@ -32,46 +37,52 @@ def write_geom(volume_element, geom_path):
     geom_path : Path
         The path to the generated file.
 
+    Notes
+    -----
+    The microstructure and texture parts are not included in the header of the generated
+    file.
+
     """
 
-    grain_idx = volume_element['grain_idx']
-    if isinstance(grain_idx, list):
-        grain_idx = np.array(grain_idx)
+    voxel_grain_idx = volume_element['voxel_grain_idx']
+    if isinstance(voxel_grain_idx, list):
+        voxel_grain_idx = np.array(voxel_grain_idx)
 
-    shape = grain_idx.shape
-    grain_idx_2d = np.concatenate(grain_idx.swapaxes(0, 2))
+    grid = voxel_grain_idx.shape
+    grain_idx_2d = np.concatenate(voxel_grain_idx.swapaxes(0, 2))
     ve_size = volume_element.get('size', [1, 1, 1])
-    ve_origin = volume_element.get('origin', [0, 0, 0])
+    ve_origin = volume_element.get('origin', [0.0, 0.0, 0.0])
+    num_micros = np.max(grain_idx_2d) + 1  # `grain_idx_2d` is zero-indexed
 
-    num_header_lns = 5
-    homog_idx = 1
+    # For now, only a single homogenization is supported:
+    homog_idx_uniq = np.unique(volume_element['voxel_homogenization_idx'])
+    if homog_idx_uniq.size > 1:
+        msg = (f'Only one homogenization is currently supported, but the volume element '
+               f'has these multiple unique homogenization indices '
+               f'(zero-indexed): {homog_idx_uniq}.')
+        raise NotImplementedError(msg)
+    else:
+        homog_idx = homog_idx_uniq[0] + 1  # needs to be one-indexed
 
-    header = (
-        '{} header\n'
-        'grid a {} b {} c {}\n'
-        'size x {} y {} z {}\n'
-        'origin x {} y {} z {}\n'
-        'microstructures {}\n'
-        'homogenization {}\n'
-    ).format(
-        num_header_lns,
-        *shape,
-        *ve_size,
-        *ve_origin,
-        np.max(grain_idx_2d),
-        homog_idx
-    )
+    header_lns = [
+        f'grid a {grid[0]} b {grid[1]} c {grid[2]}',
+        f'size x {ve_size[0]} y {ve_size[1]} z {ve_size[2]}',
+        f'origin x {ve_origin[0]} y {ve_origin[1]} z {ve_origin[2]}',
+        f'microstructures {num_micros}',
+        f'homogenization {homog_idx}',
+    ]
+    num_header_lns = len(header_lns)
+    header = f'{num_header_lns} header\n' + '\n'.join(header_lns) + '\n'
 
     arr_str = ''
     for row in grain_idx_2d:
         for col in row:
-            arr_str += '{:<5d}'.format(col)
+            arr_str += '{:<5d}'.format(col + 1)  # needs to be one-indexed
         arr_str += '\n'
 
     geom_path = Path(geom_path)
     with geom_path.open('w') as handle:
-        handle.write(header)
-        handle.write(arr_str)
+        handle.write(header + arr_str)
 
     return geom_path
 
