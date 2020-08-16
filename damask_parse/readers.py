@@ -6,7 +6,7 @@ import pandas
 import re
 import numpy as np
 
-from damask_parse.utils import get_header
+from damask_parse.utils import get_header_lines, get_num_header_lines
 
 __all__ = [
     'read_table',
@@ -345,7 +345,7 @@ def read_table(path, use_dataframe=False, combine_array_columns=True,
 
 
 def read_geom(geom_path):
-    """Parse a DAMASK geometry file.
+    """Parse a DAMASK geometry file into a volume element.
 
     Parameters
     ----------
@@ -357,56 +357,83 @@ def read_geom(geom_path):
     volume_element : dict
         Dictionary that represents the volume element parsed from the geometry
         file, with keys:
-            grain_idx : ndarray of dimension three
+            voxel_grain_idx : 3D ndarray of int
                 A mapping that determines the grain index for each voxel.
-        TODO: finish this
+            voxel_homogenization_idx : 3D ndarray of int
+                A mapping that determines the homogenization scheme (via an integer index)
+                for each voxel.
+            size : list of length three, optional
+                Volume element size. By default set to unit size: [1, 1, 1].
+            origin : list of length three, optional
+                Volume element origin. By default: [0, 0, 0].
+            grid : ndarray of int of size 3
+                Resolution of volume element discretisation in each direction. This will
+                equivalent to the shape of `voxel_grain_idx`.
+            orientations : dict
+                Dict containing the following keys:
+                    euler_angles : ndarray of shape (N, 3)
+                        Array of N row vectors of Euler angles.
+                    euler_angle_labels : list of str
+                        Labels of the Euler angles.
+            grain_phase_label_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a grain to its phase.
+            grain_orientation_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a grain to its orientation.
+            meta : dict
+                Any meta information associated with the generation of this volume
+                element.
 
     """
 
+    num_header = get_num_header_lines(geom_path)
+
     with Path(geom_path).open('r') as handle:
+
         lines = handle.read()
 
-        grains = {}
-        ori = None
-        pat = r'\<microstructure\>[\s\S]*\(constituent\).*'
-        ms_match = re.search(pat, lines)
-        if ms_match:
-            ms_str = ms_match.group()
-            grains = parse_geom_microstructure(ms_str)
-
-        pat = r'\<texture\>[\s\S]*\(gauss\).*'
-        texture_match = re.search(pat, lines)
-        if texture_match:
-            texture_str = texture_match.group()
-            texture = parse_geom_texture(texture_str)
-            for grain_idx, tex in texture.items():
-                if grain_idx not in grains:
-                    grains[grain_idx] = tex
-                else:
-                    grains[grain_idx].update(tex)
-
-            # Collect texture orientations into an array:
-            grain_keys = sorted(list(grains.keys()))
-            if not grain_keys == list(range(min(grain_keys), max(grain_keys) + 1)):
-                raise ValueError('Non-consecutive grain numbers.')
-            ori = np.zeros((len(grain_keys), 3))
-            for grain_idx, v in sorted(grains.items()):
-                ori[grain_idx - 1] = [v['phi1'], v['Phi'], v['phi2']]
-
-        com_pat = r'(geom_.*)'
-        commands = re.findall(com_pat, lines)
-
-        head_pat = r'(\d+)\sheader'
-        num_header = int(re.search(head_pat, lines).group(1))
-
+        grid = None
         grid_pat = r'grid\s+a\s+(\d+)\s+b\s+(\d+)\s+c\s+(\d+)'
         grid_match = re.search(grid_pat, lines)
-        grid = None
         if grid_match:
             grid = [int(i) for i in grid_match.groups()]
         else:
             raise ValueError('`grid` not specified in file.')
 
+        grain_idx_2d = np.zeros((grid[1] * grid[2], grid[0]), dtype=int)
+        for ln_idx, ln in enumerate(lines.splitlines()):
+            ln_split = ln.strip().split()
+            if ln_idx > num_header:
+                arr_idx = ln_idx - (num_header + 1)
+                grain_idx_2d[arr_idx] = [int(i) for i in ln_split]
+        voxel_grain_idx = grain_idx_2d.reshape(grid[::-1]).swapaxes(0, 2)
+        voxel_grain_idx -= 1  # zero-indexed
+
+        grain_phase_label_idx = None
+        grain_orientation_idx = None
+        pat = r'\<microstructure\>[\s\S]*\(constituent\).*'
+        ms_match = re.search(pat, lines)
+        if ms_match:
+            ms_str = ms_match.group()
+            microstructure = parse_microstructure(ms_str)
+            grain_phase_label_idx = microstructure['phase_idx']
+            grain_orientation_idx = microstructure['texture_idx']
+
+        orientations = None
+        pat = r'\<texture\>[\s\S]*\(gauss\).*'
+        texture_match = re.search(pat, lines)
+        if texture_match:
+            texture_str = texture_match.group()
+            orientations = parse_texture_gauss(texture_str)
+
+        # Check indices in `grain_orientation_idx` are valid, given `orientations`:
+        if (
+            np.min(grain_orientation_idx) < 0 or
+            np.max(grain_orientation_idx) > len(orientations['euler_angles'])
+        ):
+            msg = 'Orientation indices in `grain_orientation_idx` are invalid.'
+            raise ValueError(msg)
+
+        # Parse header information:
         size_pat = r'size\s+x\s+(\d+\.\d+)\s+y\s+(\d+\.\d+)\s+z\s+(\d+\.\d+)'
         size_match = re.search(size_pat, lines)
         size = None
@@ -421,29 +448,27 @@ def read_geom(geom_path):
 
         homo_pat = r'homogenization\s+(\d+)'
         homo_match = re.search(homo_pat, lines)
-        homo = None
+        vox_homo = None
         if homo_match:
-            homo = int(homo_match.group(1))
+            vox_homo = np.zeros_like(voxel_grain_idx).astype(int)
+            vox_homo[:] = int(homo_match.group(1)) - 1  # zero-indexed
 
-        grain_idx_2d = np.zeros((grid[1] * grid[2], grid[0]), dtype=int)
-        for ln_idx, ln in enumerate(lines.splitlines()):
-            ln_split = ln.strip().split()
-            if ln_idx > num_header:
-                arr_idx = ln_idx - (num_header + 1)
-                grain_idx_2d[arr_idx] = [int(i) for i in ln_split]
-
-        grain_idx = grain_idx_2d.reshape(grid[::-1]).swapaxes(0, 2)
+        com_pat = r'(geom_.*)'
+        commands = re.findall(com_pat, lines)
 
         volume_element = {
-            'num_header': num_header,
-            'commands': commands,
             'grid': grid,
-            'grain_idx': grain_idx,
-            'grains': grains,
             'size': size,
             'origin': origin,
-            'homogenization': homo,
-            'orientations': ori,
+            'orientations': orientations,
+            'voxel_grain_idx': voxel_grain_idx,
+            'voxel_homogenization_idx': vox_homo,
+            'grain_phase_label_idx': grain_phase_label_idx,
+            'grain_orientation_idx': grain_orientation_idx,
+            'meta': {
+                'num_header': num_header,
+                'commands': commands,
+            },
         }
 
     return volume_element
