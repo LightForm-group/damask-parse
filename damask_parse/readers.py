@@ -16,48 +16,93 @@ __all__ = [
 ]
 
 
-def parse_geom_microstructure(ms_str):
+def parse_microstructure(ms_str):
+    """Parse a DAMASK microstructure definition from within a string.
+
+    Parameters
+    ----------
+    ms_str : str
+        String that contains a microstructure part.
+
+    Returns
+    -------
+    microstructure : dict
+        Dict representing the parsed microstructure; with the following keys:
+            phase_idx : ndarray of int
+                Zero-indexed integer index array of phases.
+            texture_idx : ndarray of int
+                Zero-indexed integer index array of orientations.
+            fraction : ndarray of float                
+    """
+
     pat = (r'\[[G|g]rain(\d+)\][\s\S]crystallite\s(\d+)[\s\S]\(constituent\)\s+phase\s+'
            r'(\d+)\s+texture\s+(\d+)\s+fraction\s+(\d\.\d+)')
     matches = re.findall(pat, ms_str)
-    grains = {}
+    if not matches:
+        raise ValueError('No DAMASK microstructure part found in the string.')
+
+    phase_idx = []
+    texture_idx = []
+    fraction = []
     for i in matches:
-        grains.update({
-            int(i[0]): {
-                'crystallite_idx': int(i[1]),
-                'phase_idx': int(i[2]),
-                'texture_idx': int(i[3]),
-                'fraction': float(i[4]),
-            },
-        })
+        phase_idx.append(int(i[2]))
+        texture_idx.append(int(i[3]))
+        fraction.append(float(i[4]))
 
-    return grains
+    microstructure = {
+        'phase_idx': np.array(phase_idx) - 1,
+        'texture_idx': np.array(texture_idx) - 1,
+        'fraction': np.array(fraction),
+    }
+
+    return microstructure
 
 
-def parse_geom_texture(texture_str):
+def parse_texture_gauss(texture_str):
+    """Parse a DAMASK Gauss texture definition from within a string.
+
+    Parameters
+    ----------
+    texture_str : str
+        String that contains a "Gauss" texture part (i.e. euler angles for each grain).
+
+    Returns
+    -------
+    texture : dict
+        Dict representing the parsed texture; with the following keys:
+            euler_angles : ndarray of shape (N, 3)
+                Array of row vectors of Euler angles.
+            euler_angle_labels : list of str
+                Labels of the Euler angles.
+            fraction : ndarray or NoneType
+            scatter : ndarray or NoneType
+    """
+
     pat = (r'\[[G|g]rain(\d+)\][\s\S]\(gauss\)\s+phi1\s+(\d+\.?\d+)\s+Phi\s+(\d+\.?\d+)'
            r'\s+phi2\s+(\d+\.?\d+)(?:\s+scatter\s+(\d+\.?\d+)\s+fraction\s+(\d+\.?\d+))?'
            r'(?:\s+)?')
     matches = re.findall(pat, texture_str)
+    if not matches:
+        raise ValueError('No DAMASK texture part found in the string.')
 
-    grains = {}
-    for i in matches:
-        grain = {
-            'phi1': float(i[1]),
-            'Phi': float(i[2]),
-            'phi2': float(i[3]),
-        }
-        if i[4]:
-            grain.update({
-                'fraction': float(i[4]),
-            })
-        if i[5]:
-            grain.update({
-                'scatter': float(i[5]),
-            })
-        grains.update({int(i[0]): grain})
+    eulers = []
+    fraction = []
+    scatter = []
+    for texture_section in matches:
+        eulers.append([float(texture_section[i]) for i in [1, 2, 3]])
+        if texture_section[4]:
+            fraction.append(float(texture_section[4]))
+        if texture_section[5]:
+            scatter.append(float(texture_section[5]))
 
-    return grains
+    texture = {
+        'euler_angles': np.array(eulers),
+        'euler_angle_labels': ['phi1', 'Phi', 'phi2'],
+        'fraction': np.array(fraction) if fraction else None,
+        'scatter': np.array(scatter) if scatter else None,
+    }
+
+    return texture
 
 
 def parse_increment_iteration(inc_iter_str):
