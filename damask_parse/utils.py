@@ -45,19 +45,15 @@ def get_num_header_lines(path):
 
     Returns
     -------
-    num : int
-        Number of header lines in the DAMASK-generated file.
+    Number of header lines in the DAMASK-generated file.
 
     """
 
-    path = Path(path)
-    with path.open() as handle:
-        num = int(handle.read(1))
-
-    return num
+    with Path(path).open() as handle:
+        return int(re.search(r'(\d+)\sheader', handle.read()).group(1))
 
 
-def get_header(path):
+def get_header_lines(path):
     """Get the header from a file produced by DAMASK.
 
     Parameters

@@ -219,7 +219,7 @@ def read_table(path, use_dataframe=False, combine_array_columns=True,
         4: [4],
     }
 
-    header = get_header(path)
+    header = get_header_lines(path)
     header_num = len(header)
 
     if check_header:
