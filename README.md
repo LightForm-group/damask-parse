@@ -26,7 +26,7 @@ Input file writers and output file readers for the crystal plasticity code DAMAS
 
 ### Utilities:
 
-- ✅ `get_header`
+- ✅ `get_header_lines`
 - ✅ `get_num_header_lines`
 
 

@@ -1,10 +1,12 @@
 """`damask_parse.writers.py`"""
 
+import copy
 from pathlib import Path
-
+from collections import OrderedDict
 import numpy as np
 
-from damask_parse.utils import zeropad, format_1D_masked_array
+from damask_parse.utils import zeropad, format_1D_masked_array, align_orientations
+
 
 __all__ = [
     'write_geom',
@@ -87,52 +89,160 @@ def write_geom(volume_element, geom_path):
     return geom_path
 
 
-def write_material_config(material, dir_path, volume_element=None, part_paths=None,
-                          name='material.config'):
+def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
+                          separate_parts=False, part_paths=None, homog_labels=None,
+                          texture_alignment_method='axes_keyword'):
     """Write the material.config file for a DAMASK simulation.
 
     Parameters
     ----------
-    material : dict
-        Dict specify DAMASK material parameters. Key are:
-            homogenization : list of dict
-            crystallite : list of dict
-            phase : list of dict
+    homog_schemes : dict
+        Dict whose keys are homogenization scheme labels and whose values are dicts that
+        specify the homogenization parameters for that scheme.
+    phases : dict
+        Dict whose keys are phase labels and whose values are the dicts that specify the
+        phase parameters for that phase label. If `volume_element` is not specified,
+        it is preferable that this is an OrderedDict, rather than a standard dict, since
+        that will guarantee the order in which the phases are written. This is important
+        because phases are reference by (one-indexed) integer index in the microstructure
+        part.
     dir_path : str or Path
-        Directory in which to generate the file.
+        Directory in which to generate the file(s).
     volume_element : dict, optional
-        Dict that represents the specification of a volume element. If not specified,
-        `part_paths` must contain at least keys "microstructure" and "texture". Keys are:
-            grain_idx : nested list or ndarray of dimension three
+        Dictionary that represents the volume element. If not specified, `part_paths` must
+        contain at least keys "microstructure" and "texture". If specified, must have at
+        least keys (unless indicated as optional):
+            voxel_grain_idx : 3D ndarray of int
                 A mapping that determines the grain index for each voxel.
-            size : list of length three, optional
-                Volume element size. By default set, to unit size: `[1, 1, 1]`.
-    part_paths : dict of (str : str)
-        Keys are parts and values are paths to files containing the configuration for that
-        part. If `volume_element` is not specified, `part_paths` must contain at least the
-        keys: "microstructure" and "texture".
+            voxel_homogenization_idx : 3D ndarray of int
+                A mapping that determines the homogenization scheme (via an integer index)
+                for each voxel.
+            orientations : dict
+                Dict containing the following keys:
+                    euler_angles : ndarray of shape (N, 3)
+                        Array of N row vectors of Euler angles.
+                    euler_angle_labels : list of str
+                        Labels of the Euler angles.
+            grain_phase_label_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a grain to its phase.
+            grain_orientation_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a grain to its orientation.
+            phase_labels : ndarray of str
+                String array of phase labels.
+            orientation_coordinate_system : dict, optional
+                This dict allows assigning orientation coordinate system directions to
+                sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
+                'RD', 'TD' and 'ND'.
+            model_coordinate_system : dict, optional
+                This dict allows assigning model geometry coordinate system directions to
+                sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
+                'RD', 'TD' and 'ND'.
+    separate_parts : bool, optional
+        Applicable only if `volume_element` is specified. If True, microstructure and
+        texture parts will be written in separate files and linked within the material
+        config file. By default, False.
+    part_paths : dict of (str : str), optional
+        Keys are material config part names and values are paths to files containing the
+        configuration for that part. If `volume_element` is not specified, `part_paths`
+        must contain at least the keys: "microstructure" and "texture".
+    homog_labels : list of str, optional
+        List of homogenization scheme labels that maps a homogenization schemes from
+        `homog_schems` to a homogenization index (which is defined on each volume element
+        voxel.) The list should be the same length as the number of homogenization schemes
+        defined in the volume_element (i.e. the number of unique indices in the
+        `voxel_homogenization_idx` array of the volume element). If not specified, there
+        must be only one homogenization scheme in `homog_schemes`.
+    texture_alignment_method : str, optional
+        Applicable only if `volume_element` is specified. Either "axes_keyword" or
+        "rotation". If both the orientation coordinate system and the model coordinate
+        system are, within the volume element, defined and distinct, this specifies how
+        the two should be aligned. If "axes_keyword", the DAMASK "axes" key will be used;
+        if "rotation", the euler angles will be directly rotated. By default,
+        "axes_keyword".
 
     Returns
     -------
-    path : Path
-        Path of the generated file.
+    mat_conf_path : Path
+        Path of the generated material.config file.
 
     """
 
-    def format_part_name(name):
+    def format_part_name(part_name, include_delim=True):
         part_delim = '#-------------------#'
-        return f'{part_delim}\n<{name}>\n{part_delim}\n'
+        part_name_lines = [f'<{part_name}>']
+        if include_delim:
+            part_name_lines = [part_delim] + part_name_lines + [part_delim]
+        return part_name_lines
 
+    def get_part_lines(part_data, section_linebreak=True, section_order=None):
+
+        if not section_order:
+            section_order = list(part_data.keys())
+
+        if set(section_order) != set(part_data):
+            msg = (
+                f'`section_order` must be the list of section names '
+                f'{list(part_data.keys())}, ordered in the desired manner, but the '
+                f'following was passed: {section_order}.'
+            )
+            raise ValueError(msg)
+
+        lns = []
+        for section_label in section_order:
+
+            lns.append(f'[{section_label}]')
+
+            section = copy.deepcopy(part_data[section_label])
+            outputs = section.pop('outputs', [])
+            flags = section.pop('flags', [])
+
+            for key, val in sorted(section.items()):
+                lns.append(f'{key:<30s}{val}')
+            for sec_flag in sorted(flags):
+                lns.append(f'/{sec_flag}/')
+            for sec_out in sorted(outputs):
+                lns.append(f'{"(output)":<30s}{sec_out}')
+            if section_linebreak:
+                lns.append('')
+        lns.append('')
+
+        return lns
+
+    if not homog_schemes:
+        raise ValueError('Specify at least one homogenization scheme.')
+
+    if not phases:
+        raise ValueError('Specify at least one phase.')
+
+    if texture_alignment_method not in ['axes_keyword', 'rotation']:
+        msg = '`texture_alignment_method` must be either "axes_keyword" or "rotation".'
+        raise ValueError(msg)
+
+    if not homog_labels:
+        if len(homog_schemes) > 1:
+            msg = (f'If `homog_labels` is not specified, there must be only one '
+                   f'homogenization scheme in `homog_schemes`, but '
+                   f'`homog_schemes is: {homog_schemes}')
+            raise ValueError(msg)
+        else:
+            homog_labels = np.array(list(homog_schemes.keys()))
+
+    # Check homog_labels are in homog_schemes:
+    for homog_label in homog_labels:
+        if homog_label not in homog_schemes:
+            msg = (f'Homogenization label "{homog_label}" is not defined in '
+                   f'`homog_schemes`.')
+            raise ValueError(msg)
+
+    # Check microstructure and texture are specified:
     part_paths = part_paths or {}
-
     bad_inputs = False
     if volume_element is None:
-        if any([part_paths.get(i) is None for i in ['Microstructure', 'Texture']]):
+        if any([part_paths.get(i) is None for i in ['microstructure', 'texture']]):
             bad_inputs = True
     else:
-        if any([part_paths.get(i) for i in ['Microstructure', 'Texture']]):
+        if any([part_paths.get(i) for i in ['microstructure', 'texture']]):
             bad_inputs = True
-
     if bad_inputs:
         msg = ('Specify either `volume_element` or specify file paths to the '
                '"microstructure" and "texture" configurations in the `part_paths` '
@@ -147,74 +257,93 @@ def write_material_config(material, dir_path, volume_element=None, part_paths=No
         part_paths[key] = './' + val.as_posix()
 
     dir_path = Path(dir_path).resolve()
-    path = dir_path.joinpath(name)
-    with path.open('w') as handle:
+    mat_conf_path = dir_path.joinpath('material.config')
 
-        for part_name, val in material.items():
+    homog_lns = get_part_lines(homog_schemes, section_order=list(homog_labels))
+    crystallite_lns = get_part_lines({'dummy': {}})
 
-            handle.write(format_part_name(part_name))
+    phase_order = volume_element['phase_labels'] if volume_element else None
+    phase_lns = get_part_lines(phases, section_order=list(phase_order))
 
-            for section in val:
+    mat_conf_lns = (
+        format_part_name('Homogenization') + homog_lns +
+        format_part_name('Crystallite') + crystallite_lns +
+        format_part_name('Phase') + phase_lns
+    )
 
-                sec_name = section['name']
-                sec_keys = section.get('keys')
-                sec_outs = section.get('outputs')
-                sec_flags = section.get('flags')
+    if volume_element:
 
-                handle.write(f'[{sec_name}]\n')
+        ori = volume_element['orientations']
+        euler_angles = ori['euler_angles'].copy()
+        axes = None
+        ori_CS = volume_element.get('orientation_coordinate_system')
+        model_CS = volume_element.get('model_coordinate_system')
 
-                if sec_keys is not None:
-                    for sec_key, sec_keyval in sorted(sec_keys.items()):
-                        handle.write(f'{sec_key:<30s}{sec_keyval}\n')
+        if (ori_CS and model_CS) and (ori_CS != model_CS):
 
-                if sec_outs is not None:
-                    for sec_out in sorted(sec_outs):
-                        handle.write(f'{"(output)":<30s}{sec_out}\n')
+            if texture_alignment_method == 'axes_keyword':
+                OCS_inv = {v: k for k, v in ori_CS.items()}
+                axes = [('+' if not OCS_inv[v].startswith('-') else '') + OCS_inv[v]
+                        for v in model_CS.values()]
 
-                if sec_flags is not None:
-                    for sec_flag in sorted(sec_flags):
-                        handle.write(f'/{sec_flag}/\n')
+            elif texture_alignment_method == 'rotation':
+                align_orientations(euler_angles, ori_CS, model_CS)
 
-                handle.write('\n')
+        texture_data = OrderedDict()
+        for ori_idx, euler in enumerate(euler_angles):
+            ori_name = 'Orientation' + zeropad(ori_idx + 1, len(euler_angles))
+            ori_data = {
+                '(gauss)': (f'phi1 {euler[0]:8.4f} Phi {euler[1]:8.4f} '
+                            f'phi2 {euler[2]:8.4f} scatter 0.0 fraction 1.0'),
+            }
+            if axes:
+                ori_data.update({'axes': f'{axes[0]} {axes[1]} {axes[2]}'})
+            texture_data[ori_name] = ori_data
+        texture_lns = get_part_lines(texture_data, section_linebreak=False)
 
-            handle.write('\n')
+        microstructure_data = OrderedDict()
+        all_phase_idx = volume_element['grain_phase_label_idx']
+        all_ori_idx = volume_element['grain_orientation_idx']
+        for grain_idx, (phase_idx, ori_idx) in enumerate(zip(all_phase_idx, all_ori_idx)):
+            grain_name = 'Grain' + zeropad(grain_idx + 1, len(all_phase_idx))
+            grain_data = {
+                'crystallite': '1',
+                '(constituent)': (f'phase {phase_idx + 1} '
+                                  f'texture {ori_idx + 1} '
+                                  f'fraction 1.0'),
+            }
+            microstructure_data[grain_name] = grain_data
+        microstructure_lns = get_part_lines(microstructure_data, section_linebreak=False)
 
+        if separate_parts:
+
+            ms_path = dir_path.joinpath('microstructure.txt')
+            with ms_path.open('w') as handle:
+                handle.write('\n'.join(microstructure_lns) + '\n')
+
+            mat_conf_lns += format_part_name('Microstructure')
+            mat_conf_lns += [f'{{./{ms_path.relative_to(dir_path).as_posix()}}}', '']
+
+            texture_path = dir_path.joinpath('texture.txt')
+            with texture_path.open('w') as handle:
+                handle.write('\n'.join(texture_lns) + '\n')
+
+            mat_conf_lns += format_part_name('Texture')
+            mat_conf_lns += [f'{{./{texture_path.relative_to(dir_path).as_posix()}}}', '']
+
+        else:
+            mat_conf_lns += format_part_name('Microstructure') + microstructure_lns
+            mat_conf_lns += format_part_name('Texture') + texture_lns
+
+    else:
         for part_name, part_path in part_paths.items():
-            handle.write(format_part_name(part_name))
-            handle.write('{{{}}}\n\n'.format(part_path))
+            mat_conf_lns += format_part_name(part_name.capitalize())
+            mat_conf_lns += [f'{{{part_path}}}', '']
 
-        if volume_element:
+    with mat_conf_path.open('w') as handle:
+        handle.write('\n'.join(mat_conf_lns) + '\n')
 
-            # For now, the "Microstructure" part is trivial: a list of Grains, each of
-            # which contains one "crystallite" that consists of one phase.
-
-            ori = volume_element['orientations']
-            if isinstance(ori, list):
-                ori = np.array(ori)
-
-            num_grains = ori.shape[0]
-            handle.write(format_part_name('Microstructure'))
-            for i in range(num_grains):
-                grain_idx = zeropad(i + 1, num_grains)
-                grain_spec = (
-                    f'[Grain{grain_idx}]\n'
-                    f'crystallite 1\n'
-                    f'(constituent) phase 1 texture {grain_idx} fraction 1.0\n'
-                )
-                handle.write(grain_spec)
-            handle.write('\n')
-
-            handle.write(format_part_name('Texture'))
-            for i in range(num_grains):
-                grain_idx = zeropad(i + 1, num_grains)
-                tex_spec = (
-                    f'[Grain{grain_idx}]\n'
-                    f'(gauss) phi1 {ori[i][0]:8.4f} Phi {ori[i][1]:8.4f} '
-                    f'phi2 {ori[i][2]:8.4f} scatter 0.0 fraction 1.0\n'
-                )
-                handle.write(tex_spec)
-
-    return path
+    return mat_conf_path
 
 
 def write_load_case(load_path, load_cases):

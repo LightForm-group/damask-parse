@@ -7,6 +7,8 @@ import re
 
 import numpy as np
 
+from damask_parse.rotation import rot_mat2euler, euler2rot_mat_n
+
 
 def zeropad(num, largest):
     """Return a zero-padded string of a number, given the largest number.
@@ -253,3 +255,85 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1, image_a
 
     }
     return volume_element
+
+
+def add_volume_element_missing_texture(volume_element):
+    """Add a missing texture (orientation) to a volume element that has an extra grain
+    index in it's `voxel_grain_idx` array.
+
+    Notes
+    -----
+    This can be used after invoking DAMASK's `geom_canvas` pre-processing command.
+
+    """
+
+    num_grains = len(volume_element['grain_orientation_idx'])
+    max_phase_idx = np.max(volume_element['grain_phase_label_idx'])
+    max_grain_idx = np.max(volume_element['voxel_grain_idx'])  # zero-indexed
+
+    if max_grain_idx != num_grains:
+        raise ValueError('All grains seem to have an associated texture.')
+
+    volume_element['orientations']['euler_angles'] = np.vstack([
+        volume_element['orientations']['euler_angles'],
+        [[0.0, 0.0, 0.0]]
+    ])
+    volume_element['grain_orientation_idx'] = np.concatenate([
+        volume_element['grain_orientation_idx'],
+        [num_grains],
+    ])
+    volume_element['grain_phase_label_idx'] = np.concatenate([
+        volume_element['grain_phase_label_idx'],
+        [max_phase_idx + 1],
+    ])
+
+
+def align_orientations(ori, orientation_coordinate_system, model_coordinate_system):
+    """Rotate euler angles to align orientation and model coordinate systems.
+
+    Parameters
+    ----------
+    ori : ndarray of shape (N, 3)
+        Array of row vectors representing euler angles.
+    orientation_coordinate_system : dict
+        This dict allows assigning orientation coordinate system directions to
+        sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
+        'RD', 'TD' and 'ND'.
+    model_coordinate_system : dict
+        This dict allows assigning model geometry coordinate system directions to
+        sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
+        'RD', 'TD' and 'ND'.    
+
+    Notes
+    -----
+    This only supports one particular combination of orientation/model coordinate system
+    at present; it needs generalising.
+
+    """
+
+    print(f'Original Euler angles:\n{ori}')
+
+    for idx in range(ori.shape[0]):
+
+        if (
+            orientation_coordinate_system == {'x': 'RD', 'y': 'TD', 'z': 'ND'} and
+            model_coordinate_system == {'x': 'TD', 'y': 'ND', 'z': 'RD'}
+        ):
+            R = euler2rot_mat_n(ori[idx], degrees=True)[0]
+            rotR = euler2rot_mat_n(np.array([90, 90, 0]), degrees=True)[0]
+            R_new = R @ rotR
+            ang_new = np.rad2deg(rot_mat2euler(R_new))
+
+            if ang_new[0] < 0:
+                ang_new[0] += 360
+
+            if ang_new[2] < 0:
+                ang_new[2] += 360
+
+            ori[idx, :] = ang_new
+
+        else:
+            msg = 'Combination of orientation and model coordinate systems not supported.'
+            raise NotImplementedError(msg)
+
+    print(f'New Euler angles:\n{ori}')
