@@ -216,7 +216,8 @@ def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     return damask_spectral_info
 
 
-def volume_element_from_2D_microstructure(microstructure_image, depth=1, image_axes=['y', 'x']):
+def volume_element_from_2D_microstructure(microstructure_image, depth=1,
+                                          image_axes=['y', 'x']):
     """Extrude a 2D microstructure by a given depth to form a 3D volume element.
 
     Parameters
@@ -234,11 +235,13 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1, image_a
     -------
     volume_element : dict
         Dict with the following keys:
-            grain_idx : ndarray of shape (depth, N, M)
+            voxel_grain_idx : ndarray of shape (depth, N, M)
+            grain_orientation_idx : ndarray of int
             size: tuple of length three
             orientations : ndarray of shape (P, 3)
 
     """
+
     # parse image axis directions and add extrusion direction (all +ve only)
     conv_axis = {'x': 0, 'y': 1, 'z': 2}
     image_axes = [conv_axis[axis] for axis in image_axes]
@@ -248,11 +251,16 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1, image_a
     grain_idx = microstructure_image['grains'][:, :, np.newaxis]
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
-    volume_element = {
-        'grain_idx': grain_idx,
-        'size': grain_idx.shape,
-        'orientations': microstructure_image['orientations'],
 
+    volume_element = {
+        'size': [i/depth for i in grain_idx.shape],
+        'grid': grain_idx.shape,
+        'orientations': {
+            'euler_angles': microstructure_image['orientations'],
+            'euler_angle_labels': ['phi1', 'Phi', 'phi2'],
+        },
+        'voxel_grain_idx': grain_idx,
+        'grain_orientation_idx': np.arange(grain_idx.max() + 1),
     }
     return volume_element
 
