@@ -1,5 +1,19 @@
 # Change Log
 
+## [0.1.11] - 2020.08.18
+
+### Added
+
+- Multiple phases and multiple homogenization schemes are now supported.
+
+### Changed
+
+- Function `parse_geom_microstructure` renamed to `parse_microstructure` and now returns a dict of arrays instead of a list of dicts for each grain.
+- Function `parse_geom_texture` renamed to `parse_texture_gauss` and now returns a dict of arrays instead of a list of dicts for each texture component.
+- Function `get_header` renamed to `get_header_lines`.
+- Function `get_num_header_lines` now uses a regular expression.
+- Function `write_material_config` now has the option to write microstructure and texture parts into separate files.
+
 ## [0.1.10] - 2020.07.28
 
 ### Changed
