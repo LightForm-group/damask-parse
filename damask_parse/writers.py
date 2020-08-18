@@ -24,9 +24,10 @@ def write_geom(volume_element, geom_path):
         Dict that represents the specification of a volume element, with keys:
             voxel_grain_idx : nested list or 3D ndarray of int
                 A mapping that determines the grain index for each voxel.
-            voxel_homogenization_idx : nested list or 3D ndarray of int
+            voxel_homogenization_idx : nested list or 3D ndarray of int, optional
                 A mapping that determines the homogenization scheme (via an integer index)
-                for each voxel. Currently, only one homogenization index is supported.
+                for each voxel. Currently, only one homogenization index is supported. If
+                not specified, the default of 0 is used.
             size : list of length three, optional
                 Volume element size. By default set to unit size: [1, 1, 1].
             origin : list of length three, optional
@@ -57,7 +58,7 @@ def write_geom(volume_element, geom_path):
     num_micros = np.max(grain_idx_2d) + 1  # `grain_idx_2d` is zero-indexed
 
     # For now, only a single homogenization is supported:
-    homog_idx_uniq = np.unique(volume_element['voxel_homogenization_idx'])
+    homog_idx_uniq = np.unique(volume_element.get('voxel_homogenization_idx', 0))
     if homog_idx_uniq.size > 1:
         msg = (f'Only one homogenization is currently supported, but the volume element '
                f'has these multiple unique homogenization indices '
