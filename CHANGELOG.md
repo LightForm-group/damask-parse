@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.1.12] - 2020.08.22
+
+### Added 
+
+- Added functions `readers.read_HDF5_file` and `utils.get_HDF5_incremental_quantity`.
+
+### Fixed
+
+- In the case where the `volume_element` is passed to `writers.write_material_config`, ensure `phase_order` is passed to `get_part_lines` as a list and not as a Numpy array.
+
 ## [0.1.11] - 2020.08.18
 
 ### Added
