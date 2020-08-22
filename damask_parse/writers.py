@@ -263,8 +263,8 @@ def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
     homog_lns = get_part_lines(homog_schemes, section_order=list(homog_labels))
     crystallite_lns = get_part_lines({'dummy': {}})
 
-    phase_order = volume_element['phase_labels'] if volume_element else None
-    phase_lns = get_part_lines(phases, section_order=list(phase_order))
+    phase_order = list(volume_element['phase_labels']) if volume_element else None
+    phase_lns = get_part_lines(phases, section_order=phase_order)
 
     mat_conf_lns = (
         format_part_name('Homogenization') + homog_lns +
