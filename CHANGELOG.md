@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.13] - 2020.08.22
+
+### Changed
+
+- Add `frequency` parameter (i.e. dump frequency) to `write_load_case`.
+
 ## [0.1.12] - 2020.08.22
 
 ### Added 
