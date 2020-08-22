@@ -365,6 +365,7 @@ def write_load_case(load_path, load_cases):
         rot = load_case.get('rotation')
         total_time = load_case['total_time']
         num_increments = load_case['num_increments']
+        freq = load_case.get('dump_frequency', 1)
 
         if def_grad_aim is not None and def_grad_rate is not None:
             msg = 'Specify only one of `def_grad_rate` and `def_grad_aim`.'
@@ -434,7 +435,8 @@ def write_load_case(load_path, load_cases):
 
         load_case_ln.extend([
             f't {total_time}',
-            f'incs {num_increments}'
+            f'incs {num_increments}',
+            f'freq {freq}',
         ])
 
         if rot is not None:
