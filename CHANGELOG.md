@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.14] - 2020.08.23
+
+### Fixed
+
+- Add missing dependencies (`h5py`, `damask`) from `setup.py`.
+
 ## [0.1.13] - 2020.08.22
 
 ### Changed
