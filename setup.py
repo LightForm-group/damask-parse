@@ -43,7 +43,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy',
-        'pandas'
+        'pandas',
+        'h5py',
+        'damask',
     ],
     project_urls={
         'Github': 'https://github.com/LightForm-group/damask-parse',
