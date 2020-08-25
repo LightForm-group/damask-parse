@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.15] - 2020.08.25
+
+### Added
+
+- Add function `writers.write_numerics_config`.
+
 ## [0.1.14] - 2020.08.23
 
 ### Fixed
