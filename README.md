@@ -23,6 +23,7 @@ Input file writers and output file readers for the crystal plasticity code DAMAS
 - ✅ `write_geom`
 - ✅ `write_load`
 - ✅ `write_material_config`
+- ✅ `write_numerics_config`
 
 ### Utilities:
 
