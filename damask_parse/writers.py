@@ -11,6 +11,7 @@ from damask_parse.utils import zeropad, format_1D_masked_array, align_orientatio
 __all__ = [
     'write_geom',
     'write_material_config',
+    'write_numerics_config',
     'write_load_case',
 ]
 
@@ -461,3 +462,30 @@ def write_load_case(load_path, load_cases):
         handle.write(all_load_case_str)
 
     return load_path
+
+
+def write_numerics_config(dir_path, numerics):
+    """Write the optional numerics.config file for a DAMASK simulation.
+
+    Parameters
+    ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
+    numerics : dict
+        Dict of key-value pairs to write into the file.
+
+    Returns
+    -------
+    numerics_path : Path
+        File path to the generated numerics.config file.
+
+    """
+
+    dir_path = Path(dir_path).resolve()
+    numerics_path = dir_path.joinpath('numerics.config')
+
+    with numerics_path.open('w') as handle:
+        for key, val in numerics.items():
+            handle.write(f'{key:<30} {val}')
+
+    return numerics_path
