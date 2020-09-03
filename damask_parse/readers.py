@@ -581,7 +581,7 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
                 The name by which the quantity will be stored in the output dict.
             path: str
                 The HDF5 "path" to the dataset.
-            transform: list of dict, optional
+            transforms: list of dict, optional
                 If specified this is a list of dicts, each with the following keys:
                     sum_along_axes : int, optional
                         If specified, take the sum the array along this axis.
