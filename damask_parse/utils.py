@@ -267,8 +267,8 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1,
 
 
 def add_volume_element_missing_texture(volume_element):
-    """Add a missing texture (orientation) to a volume element that has an extra grain
-    index in it's `voxel_grain_idx` array.
+    """Add missing textures (orientations) to a volume element that has extra grain
+    indexes in it's `voxel_grain_idx` array. Each grain is assigned a new phase idx
 
     Notes
     -----
@@ -280,20 +280,24 @@ def add_volume_element_missing_texture(volume_element):
     max_phase_idx = np.max(volume_element['grain_phase_label_idx'])
     max_grain_idx = np.max(volume_element['voxel_grain_idx'])  # zero-indexed
 
-    if max_grain_idx != num_grains:
+    if max_grain_idx == num_grains - 1:
         raise ValueError('All grains seem to have an associated texture.')
+
+    num_new_grains = max_grain_idx - num_grains + 1
+    if num_new_grains <= 0:
+        raise ValueError('Problem with volume element.')
 
     volume_element['orientations']['euler_angles'] = np.vstack([
         volume_element['orientations']['euler_angles'],
-        [[0.0, 0.0, 0.0]]
+        np.zeros((num_new_grains, 3))
     ])
     volume_element['grain_orientation_idx'] = np.concatenate([
         volume_element['grain_orientation_idx'],
-        [num_grains],
+        list(range(num_grains, num_grains+num_new_grains)),
     ])
     volume_element['grain_phase_label_idx'] = np.concatenate([
         volume_element['grain_phase_label_idx'],
-        [max_phase_idx + 1],
+        list(range(max_phase_idx+1, max_phase_idx+num_new_grains+1)),
     ])
 
 
