@@ -231,18 +231,22 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1,
                 Euler angles for each grain.
     depth : int, optional
         By how many voxels the microstructure should be extruded. By default, 1.
+    image_axes : list, optional
+        Directions along the ndarray axes. Possible values ('x', 'y', 'z')
 
     Returns
     -------
     volume_element : dict
         Dict with the following keys:
-            voxel_grain_idx : ndarray of shape (depth, N, M)
-            grain_orientation_idx : ndarray of int
             size: tuple of length three
-            orientations : ndarray of shape (P, 3)
+            grid: tuple of length three
+            orientations: dict
+            voxel_grain_idx : ndarray of shape (N, M, depth)
+            grain_orientation_idx : ndarray of int
+            phase_labels : list of str
+            grain_phase_label_idx : ndarray of int
 
     """
-
     # parse image axis directions and add extrusion direction (all +ve only)
     conv_axis = {'x': 0, 'y': 1, 'z': 2}
     image_axes = [conv_axis[axis] for axis in image_axes]
@@ -253,16 +257,104 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1,
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
 
+    num_grains = np.max(grain_idx) + 1
+
     volume_element = {
-        'size': [i/depth for i in grain_idx.shape],
+        'size': tuple(i/depth for i in grain_idx.shape),
         'grid': grain_idx.shape,
         'orientations': {
             'euler_angles': microstructure_image['orientations'],
             'euler_angle_labels': ['phi1', 'Phi', 'phi2'],
         },
         'voxel_grain_idx': grain_idx,
-        'grain_orientation_idx': np.arange(grain_idx.max() + 1),
+        'grain_orientation_idx': np.arange(num_grains),
+        'phase_labels': ['matrix'],
+        'grain_phase_label_idx': np.zeros(num_grains, dtype=int),
     }
+    return volume_element
+
+def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, phase_labels, order=['x', 'y', 'z']):
+    """Add buffer material regions to a volume element.
+
+    Parameters
+    ----------
+    volume_element : dict
+        Dict with the following keys:
+            size: tuple of length three
+            grid: tuple of length three
+            orientations: dict
+            voxel_grain_idx : ndarray of shape (N, M, depth)
+            grain_orientation_idx : ndarray of int
+            phase_labels : list of str
+            grain_phase_label_idx : ndarray of int
+    buffer_sizes : list of int, length 6
+        Size of buffer on each face [-x, +x, -y, +y, -z, +z]
+    phase_ids : list of int, length 6
+        Phase of each buffer. Relative, so 1 is the first new phase and so on
+    phase_labels : list of str
+        Labels of the new phases
+    order : list of str, optional
+        Order to add the zones in, default [x, y, z]
+
+    """
+    conv_order = {'x': 0, 'y': 1, 'z': 2}
+    order = [conv_order[axis] for axis in order]
+
+    # new grid dimensions
+    grid = volume_element['grid']  # tuple
+    delta_grid = tuple(buffer_sizes[2*i] + buffer_sizes[2*i + 1] for i in range(3))
+    new_grid = tuple(a + b for a, b in zip(grid, delta_grid))
+
+    # scale size based on material added
+    new_size = tuple(s / og * ng for og, ng, s in zip(grid, new_grid, volume_element['size']))
+
+    # validate new phases
+    phase_ids_unq = sorted(set(pid for pid, bs in zip(phase_ids, buffer_sizes) if bs > 0))
+    if phase_ids_unq[0] != 1 and phase_ids_unq[-1] != len(phase_ids_unq):
+        raise ValueError("Issue with buffer phases.")
+    if len(phase_labels) != len(phase_ids_unq):
+        raise ValueError("Issue with buffer phase labels.")
+
+    # new phase and grain ids to add. 1 grain per phase
+    grain_idx = volume_element['voxel_grain_idx']
+    next_grain_id = grain_idx.max() + 1
+
+    new_grain_ids = []
+    for i in range(len(phase_ids_unq)):
+        volume_element['phase_labels'].append(phase_labels[i])
+        new_grain_ids.append(next_grain_id)
+        next_grain_id += 1
+
+    # add the buffer regions
+    for axis in order:
+        if delta_grid[axis] == 0:
+            continue
+
+        new_blocks = []
+        for i in range(2):
+            buffer_size = buffer_sizes[2*axis+i]
+            if buffer_size <= 0:
+                continue
+
+            grain_id = new_grain_ids[phase_ids[2*axis+i] - 1]
+
+            buffer_shape = list(grain_idx.shape)
+            buffer_shape[axis] = buffer_size
+
+            new_block = np.full(buffer_shape, grain_id)
+            new_blocks.append(new_block)
+
+            if i == 0:
+                new_blocks.append(grain_idx)
+
+        grain_idx = np.concatenate(new_blocks, axis=axis)
+
+    volume_element.update(
+        size=new_size, 
+        grid=new_grid, 
+        voxel_grain_idx=grain_idx
+    )
+    add_volume_element_missing_texture(volume_element)
     return volume_element
 
 
