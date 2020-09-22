@@ -11,7 +11,8 @@ from ruamel.yaml import YAML
 from damask_parse.utils import (
     get_header_lines,
     get_num_header_lines,
-    get_HDF5_incremental_quantity
+    get_HDF5_incremental_quantity,
+    validate_volume_element,
 )
 from damask_parse.legacy.readers import parse_microstructure, parse_texture_gauss
 
@@ -447,40 +448,62 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
 
 
 def read_material(path):
-    """Read a material.yaml file
+    """Parse a DAMASK material.yaml input file.
 
     Parameters
     ----------
     path : str or Path
-        Path to the DAMASK material.yaml file.
+        Path to the DAMASK material.yaml file.    
 
     Returns
     -------
-    material : dict
-        Dict with keys:
-            homogenization : dict
-                Keys are user-defined homogenization names. Values are dicts that
-                determine the properties of that homogenization scheme.
-            microstructure : list of dict
-                Each list item is a dict that represents a microstructure component. Each
-                dict may have the following keys:
-                    constituents : list of dict
-                        Each list item is a dict that represents a constituent. Each dict
-                        may have the following components:
-                            fraction : float
-                            orientation : list of length four of float
-                                Crystal orientation of the constituent represented as a
-                                quaternion.
-                            phase : str
-                                Phase label that identifies the phase within the "phase"
-                                dict with which this constituent should be associated.
-                    homogenization : str
-                        Homogenization label that identifies the homogenization scheme
-                        within the "homogenization" dict with which this microstructure
-                        should be associated.
+    material_data : dict
+        Parsed data from the DAMASK material.yaml file.
+
+    Notes
+    -----
+    - `read_material` and `write_material` should be round-trip-able
 
     """
 
     yaml = YAML(typ='safe')
-    material = yaml.load(Path(path))
-    return material
+    material_dat = yaml.load(Path(path))
+
+    material_homog = []
+    const_material_idx = []
+    const_material_fraction = []
+    const_phase_label = []
+    const_orientation_idx = []
+    orientations = {
+        'type': 'quat',
+        'quaternions': [],
+    }
+
+    for mat_idx, material in enumerate(material_dat['microstructure']):
+        material_homog.append(material['homogenization'])
+        for const in material['constituents']:
+            const_material_idx.append(mat_idx)
+            const_material_fraction.append(const['fraction'])
+            const_phase_label.append(const['phase'])
+            orientations['quaternions'].append(const['orientation'])
+            const_orientation_idx.append(len(const_orientation_idx))
+
+    vol_elem = {
+        'constituent_material_idx': const_material_idx,
+        'constituent_material_fraction': const_material_fraction,
+        'constituent_phase_label': const_phase_label,
+        'constituent_orientation_idx': const_orientation_idx,
+        'material_homog': material_homog,
+        'orientations': orientations,
+    }
+    material_data = {
+        'volume_element': vol_elem,
+        'phases': material_dat['phase'],
+        'homog_schemes': material_dat['homogenization']
+    }
+    material_data['volume_element'] = validate_volume_element(
+        **material_data,
+        ignore_missing_elements=True
+    )
+
+    return material_data
