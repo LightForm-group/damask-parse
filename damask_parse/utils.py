@@ -83,11 +83,11 @@ def get_header_lines(path):
     return header_lines
 
 
-def validate_volume_element(volume_element):
+def validate_volume_element_OLD(volume_element):
     """Validate the parameters of a volume element, as used in the DAMASK
     geometry file format.
 
-    TODO: check values of optional keys.
+    TODO: re-implement
 
     Parameters
     ----------
@@ -103,33 +103,73 @@ def validate_volume_element(volume_element):
 
     keys = volume_element.keys()
 
-    man_keys = ['grain_idx']
-    opt_keys = ['size', 'orientations']
-    array_keys = ['grain_idx', 'size', 'orientations']
+    man_keys = [
+        'voxel_homogenization_idx',
+        'orientations',
+        'grain_phase_label_idx',
+        'grain_orientation_idx',
+        'phase_labels',
+        'grid_size',
+    ]
+    opt_keys = [
+        'voxel_grain_idx',
+        'constituent_voxel_idx',
+        'grain_constituent_idx',
+    ]
+    array_keys = [
+        'voxel_homogenization_idx',
+        'voxel_grain_idx',
+        'constituent_voxel_idx',
+        'grain_constituent_idx',
+        'grain_phase_label_idx',
+        'grain_orientation_idx',
+    ]
 
-    good_keys = list(set(man_keys) | set(opt_keys))
+    good_keys = man_keys + opt_keys
     missing_keys = list(set(man_keys) - set(keys))
     bad_keys = list(set(keys) - set(good_keys))
 
     # Check mandatory keys exist:
     if len(missing_keys) > 0:
-        msg = ('Volume element is missing mandatory key(s): {}')
-        raise ValueError(msg.format(missing_keys))
+        raise ValueError(f'Volume element is missing mandatory key(s): {missing_keys}.')
 
     # Check for unknown keys:
     if len(bad_keys) > 0:
-        msg = ('Volume element contains unknown key(s): {}')
-        raise ValueError(msg.format(bad_keys))
+        raise ValueError(f'Volume element contains unknown key(s): {bad_keys}.')
 
-    # Transform array-like keys to ndarrays:
+    vox_err = False
+    const_vox_idx = None
+    grain_const_idx = None
+    if 'voxel_grain_idx' in volume_element:
+        if (
+            'constituent_voxel_idx' in volume_element or
+            'grain_constituent_idx' in volume_element
+        ):
+            vox_err = True
+        else:
+            num_elems = np.product(volume_element['grid_size'])
+            num_grains = len(volume_element['grains_phase_label_idx'])
+            const_vox_idx = []
+            grain_const_idx = np.arange(num_grains)
+    else:
+        if not (
+            'constituent_voxel_idx' in volume_element and
+            'grain_constituent_idx' in volume_element
+        ):
+            vox_err = True
+
+    if vox_err:
+        msg = (f'Specify either `voxel_grain_idx` or both `constituent_voxel_idx` '
+               f'and `grain_constituent_idx`.')
+        raise ValueError(msg)
+
+    # Transform array-like keys to ndarrays if not None:
     validated_ve = {}
     for key in keys:
         val = copy.deepcopy(volume_element[key])
-        if key in array_keys and not isinstance(val, np.ndarray):
+        if val and key in array_keys and not isinstance(val, np.ndarray):
             val = np.array(val)
-        validated_ve.update({
-            key: val
-        })
+        validated_ve.update({key: val})
 
     # Check mandatory key values:
     grain_idx = validated_ve['grain_idx']
@@ -154,12 +194,14 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
     is_equal : bool
         True if `vol_elem_a` is equal to `vol_elem_b`. Otherwise, False.
 
+    TODO: re-implement
+
     """
 
     array_keys = ['grain_idx', 'size', 'orientations']
 
-    vol_elem_a = validate_volume_element(vol_elem_a)
-    vol_elem_b = validate_volume_element(vol_elem_b)
+    vol_elem_a = validate_volume_element_OLD(vol_elem_a)
+    vol_elem_b = validate_volume_element_OLD(vol_elem_b)
 
     # Check they have the same keys:
     if vol_elem_a.keys() != vol_elem_b.keys():
@@ -311,7 +353,7 @@ def align_orientations(ori, orientation_coordinate_system, model_coordinate_syst
     model_coordinate_system : dict
         This dict allows assigning model geometry coordinate system directions to
         sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
-        'RD', 'TD' and 'ND'.    
+        'RD', 'TD' and 'ND'.
 
     Notes
     -----
@@ -387,3 +429,323 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
                     data = np.sum(data, i['sum_along_axes'])
 
         return data
+
+
+def euler2quat(euler_angles):
+    """Conver Bunge-convention Eueler angles to unit quaternions.
+
+    Parameters
+    ----------
+    euler_angles : ndarry of shape (N, 3) of float
+        Array of N row three-vectors of Euler angles, specified as proper Euler angles in
+        the Bunge convention (rotations are about Z, new X, new new Z).
+
+    Returns
+    -------
+    quats : ndarray of shape (N, 4) of float
+        Array of N row four-vectors of unit quaternions.
+
+    Notes
+    -----
+    Conversion of Bunge Euler angles to quaternions due to Ref. [1].
+
+    References
+    ----------
+    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
+        P J Konijnenberg, and M De Graef. "Consistent Representations
+        of and Conversions between 3D Rotations". Modelling and Simulation
+        in Materials Science and Engineering 23, no. 8 (1 December 2015):
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.            
+
+    """
+
+    phi_1 = euler_angles[:, 0]
+    Phi = euler_angles[:, 1]
+    phi_2 = euler_angles[:, 2]
+
+    sigma = 0.5 * (phi_1 + phi_2)
+    delta = 0.5 * (phi_1 - phi_2)
+    c = np.cos(Phi / 2)
+    s = np.sin(Phi / 2)
+
+    quats = np.array([
+        +c * np.cos(sigma),
+        -s * np.cos(delta),
+        -s * np.sin(delta),
+        -c * np.sin(sigma),
+    ]).T
+
+    # Move to northern hemisphere:
+    quats[quats[:, 0] < 0] *= -1
+
+    return quats
+
+
+def validate_orientations(orientations, volume_element=None):
+    """Check a set of orientations are valid, optionally with respect to a volume element.
+
+    Parameters
+    ----------
+    orientations : dict
+        Dict containing the following keys:
+            type : str
+                One of "euler", "quat".
+            quaternions : (list or ndarray of shape (R, 4)) of float, optional
+                Array of R row four-vectors of unit quanternions. Specify either
+                `quaternions` or `euler_angles`.
+            euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
+                Array of R row three-vectors of Euler angles. Specify either `quaternions`
+                or `euler_angles`. Specified as proper Euler angles in the Bunge
+                convention (rotations are about Z, new-X, new-new-Z).
+    volume_element : dict, optional
+        If specified, check the values in `constituent_orientation_idx` are valid indices 
+        into `orientations`. Dict with the following required keys:
+            constituent_orientation_idx : ndarray of shape (N,) of int
+                Determines the orientation (as an index into `orientations`) associated
+                with each constituent, where N is the number of constituents.
+
+    Returns
+    -------
+    orientations_valid : dict
+        Validated orientations where, if orientations were specified as Euler angles in
+        `orientations`, they have been converted to quaternions. Dict with the following
+        key/values:
+            type : str
+                Value is "quat".
+            quaternions : ndarray of shape (R, 4) of float
+                Orientations represented as an array of row 4-vectors.
+
+    """
+
+    # LATER: maybe need to represent as list of list of Decimal instead of float
+    # ndarray (should get around 15 dp from float) ?
+
+    ori_type = orientations.get('type')
+    eulers = orientations.get('euler_angles')
+    quats = orientations.get('quaternions')
+
+    if ori_type not in ['euler', 'quat']:
+        msg = f'Specify orientation `type` as either "euler" or "quat".'
+        raise ValueError(msg)
+
+    elif ori_type == 'euler':
+        if eulers is None:
+            msg = (f'Specify orientations as an array of row three-vector Euler angles '
+                   f'with the key "euler_angles".')
+            raise ValueError(msg)
+        euler_angles = np.array(eulers)
+        if euler_angles.shape[1] != 3:
+            msg = (f'Euler angles specified in "euler_angles" should be a nested list or '
+                   f'array of shape (R, 3), but shape passed was: {euler_angles.shape}.')
+            raise ValueError(msg)
+
+        # Convert Euler angles to quaternions:
+        quaternions = euler2quat(euler_angles)
+
+    elif ori_type == 'quat':
+        if quats is None:
+            msg = (f'Specify orientations as an array of row four-vector unit '
+                   f'quaternions with the key "quaternions".')
+            raise ValueError(msg)
+        quaternions = np.array(quats)
+        if quaternions.shape[1] != 4:
+            msg = (f'Quaternions specified in "quaternions" should be a nested list or '
+                   f'array of shape (R, 4), but shape passed was: {quaternions.shape}.')
+            raise ValueError(msg)
+
+    # TODO: should we check and raise if not normalised?
+    norm_factor = np.sqrt(np.sum(quaternions ** 2, axis=1))
+    if not np.allclose(norm_factor, 1):
+        print('Quaternions are not normalised; they will be normalised.')
+        quaternions = quaternions / norm_factor[:, None]
+
+    orientations_valid = {
+        'type': 'quat',
+        'quaternions': quaternions,
+    }
+
+    return orientations_valid
+
+
+def validate_volume_element(volume_element, phases=None, homog_schemes=None,
+                            ignore_missing_elements=False,
+                            ignore_missing_constituents=False):
+    """
+
+    Parameters
+    ----------
+    volume_element : dict
+    phases : dict
+    homog_schemes : dict
+    ignore_missing_elements : bool, optional
+        If True, ignore missing `element_material_idx` and `grid_size`, which are used to
+        determine to which material each geometric model element belongs and the volume
+        element discretisation dimensions.
+    ignore_missing_constituents : bool, optional
+        If True, ignore missing keys: `constituent_material_idx`,
+        `constituent_phase_label`, `material_homog`, `constituent_material_fraction`,
+        `constituent_orientation_idx`. These keys are used to determine how constituents
+        (e.g. grains) are distributed among the different "materials", which are indexed
+        in `element_material_idx`. If True, default values of these keys will be set,
+        assuming that each material has just one constituent (with no/trivial
+        homogenization).
+
+    Notes
+    -----
+    - If phases (homog_schemes), check against vol_elem.             
+    - if no constituent data, assume one constituent per "material", populate the
+      constituent data, and assume orientations should match constituents 1-to-1.
+
+    """
+
+    req = [
+        'orientations',
+        'constituent_material_idx',
+        'constituent_phase_label',
+        'material_homog',
+        'element_material_idx',
+        'grid_size',
+    ]
+
+    if ignore_missing_elements:
+        if ignore_missing_constituents:
+            raise ValueError(
+                'Cannot ignore both missing elements and missing constituents!')
+        req.remove('element_material_idx')
+        req.remove('grid_size')
+
+    elif ignore_missing_constituents:
+        req.remove('constituent_material_idx')
+        req.remove('constituent_phase_label')
+        req.remove('material_homog')
+
+    if ignore_missing_constituents:
+        allowed = req
+    else:
+        allowed = req + [
+            'constituent_material_fraction',  # default value can be set
+            'constituent_orientation_idx',    # default value can be set (sometimes)
+        ]
+
+    missing = set(req) - set(volume_element)
+    if missing:
+        missing_fmt = ', '.join([f'"{i}"' for i in missing])
+        msg = f'The following volume element keys are missing: {missing_fmt}.'
+        raise ValueError(msg)
+
+    unknown = set(volume_element) - set(allowed)
+    if unknown:
+        unknown_fmt = ', '.join([f'"{i}"' for i in unknown])
+        msg = f'The following volume element keys are unknown: {unknown_fmt}.'
+        raise ValueError(msg)
+
+    float_arrs = ['constituent_material_fraction']
+    int_arrs = [
+        'constituent_material_idx',
+        'constituent_orientation_idx',
+        'element_material_idx',
+        'grid_size',
+    ]
+    str_arrs = [
+        'constituent_phase_label',
+        'material_homog',
+    ]
+    arr_keys = float_arrs + int_arrs + str_arrs
+    num_const = None
+    for key in volume_element:
+
+        # Convert lists to arrays and check dtypes:
+        if key in arr_keys:
+            new_val = np.array(volume_element[key])
+            if new_val.ndim != 1:
+                msg = (f'Volume element key "{key}" should be a 1D array but has '
+                       f'{new_val.ndim} dimensions.')
+                raise TypeError(msg)
+            if key in float_arrs:
+                if new_val.dtype.type is not np.float_:
+                    msg = (f'Volume element key "{key}" should be a float array but has '
+                           f'dtype "{new_val.dtype}".')
+                    raise TypeError(msg)
+            elif key in int_arrs:
+                if new_val.dtype.type is not np.int_:
+                    msg = (f'Volume element key "{key}" should be an int array but has '
+                           f'dtype "{new_val.dtype}".')
+                    raise TypeError(msg)
+            elif key in str_arrs:
+                if new_val.dtype.type is not np.str_:
+                    msg = (f'Volume element key "{key}" should be a str array but has '
+                           f'dtype "{new_val.dtype}".')
+                    raise TypeError(msg)
+            volume_element[key] = new_val
+
+        # Check all "constituent_*" keys are the same length:
+        if key.startswith('constituent_'):
+            if num_const is None:
+                num_const = volume_element[key].size
+            elif volume_element[key].size != num_const:
+                msg = (f'Not all "constituent_*" volume element keys are of equal length.'
+                       f'Found lengths: {num_const} and {volume_element[key].size}.')
+                raise ValueError(msg)
+
+    orientations = validate_orientations(
+        volume_element['orientations'], volume_element=volume_element)
+    volume_element['orientations'] = orientations
+
+    # Set a default `constituent_orientation_idx`:
+    if 'constituent_orientation_idx' in allowed:
+        if volume_element.get('constituent_orientation_idx') is None:
+            # Can only set default if number of orientations provided exactly matches
+            # number of constituents provided:
+            ori_type = volume_element['orientations']['type']
+            ori_arr_name = {'euler': 'euler_angles', 'quat': 'quaternions'}[ori_type]
+            num_oris = volume_element['orientations'][ori_arr_name].shape[0]
+            num_const = volume_element['constituent_material_idx'].shape[0]
+            if num_oris != num_const:
+                msg = (f'Cannot set default values for `constituent_orientation_idx`, '
+                       f'since the number of constituents ({num_const}) does not match '
+                       f'the number of orientations ({num_oris}).')
+                raise ValueError(msg)
+            else:
+                volume_element['constituent_orientation_idx'] = np.arange(num_oris)
+
+    # Provide a default `constituent_material_fraction`:
+    if 'constituent_material_fraction' in allowed:
+        const_mat_idx = volume_element['constituent_material_idx']
+        const_mat_frac = volume_element.get('constituent_material_fraction')
+        const_mat_idx_uniq, const_mat_idx_inv, const_mat_idx_counts = np.unique(
+            const_mat_idx,
+            return_inverse=True,
+            return_counts=True,
+        )
+        if const_mat_frac is None:
+            # Default is (1 / number of constituents) for each material:
+            const_mat_frac = (1 / const_mat_idx_counts)[const_mat_idx_inv]
+            volume_element['constituent_material_fraction'] = const_mat_frac
+        else:
+            # Check constituent fractions sum to one within a material:
+            for mat_idx in const_mat_idx_uniq:
+                mat_const_idx = np.isin(const_mat_idx, mat_idx)
+                frac_sum = np.sum(const_mat_frac[mat_const_idx])
+                if not np.isclose(frac_sum, 1):
+                    msg = (f'Constituent fractions must sum to one, but fractions in '
+                           f'material {mat_idx} sum to {frac_sum}.')
+                    raise ValueError(msg)
+
+    if 'element_material_idx' in req:
+        num_elems = volume_element['element_material_idx'].size
+        grid_size_prod = np.prod(volume_element['grid_size'])
+        if grid_size_prod != num_elems:
+            msg = (f'Number of elements in volume element (i.e. length of array '
+                   f'`element_material_idx`, ({num_elems}), should match the product of '
+                   f'`grid_size` ({volume_element["grid_size"]}, {grid_size_prod}).')
+            raise ValueError(msg)
+
+    if 'constituent_material_idx' in req:
+        max_mat_idx = np.max(volume_element['constituent_material_idx'])
+        num_mats = volume_element['material_homog'].size
+        if max_mat_idx != (num_mats - 1):
+            msg = (f'Maximum material index in `constituent_material_idx` ({max_mat_idx})'
+                   f' does not index into `material_homog` with length {num_mats}.')
+            raise ValueError(msg)
+
+    return volume_element
