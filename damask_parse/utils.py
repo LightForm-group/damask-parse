@@ -710,9 +710,12 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
 
     # Provide a default `constituent_material_fraction`:
     if 'constituent_material_fraction' in allowed:
+
         const_mat_idx = volume_element['constituent_material_idx']
+        validate_constituent_material_idx(const_mat_idx)
+
         const_mat_frac = volume_element.get('constituent_material_fraction')
-        const_mat_idx_uniq, const_mat_idx_inv, const_mat_idx_counts = np.unique(
+        _, const_mat_idx_inv, const_mat_idx_counts = np.unique(
             const_mat_idx,
             return_inverse=True,
             return_counts=True,
@@ -723,9 +726,9 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
             volume_element['constituent_material_fraction'] = const_mat_frac
         else:
             # Check constituent fractions sum to one within a material:
-            for mat_idx in const_mat_idx_uniq:
-                mat_const_idx = np.isin(const_mat_idx, mat_idx)
-                frac_sum = np.sum(const_mat_frac[mat_const_idx])
+            mat_const_idx = get_material_constituent_idx(const_mat_idx)
+            for mat_idx, mat_i_const_idx in enumerate(mat_const_idx):
+                frac_sum = np.sum(const_mat_frac[mat_i_const_idx])
                 if not np.isclose(frac_sum, 1):
                     msg = (f'Constituent fractions must sum to one, but fractions in '
                            f'material {mat_idx} sum to {frac_sum}.')
@@ -749,3 +752,101 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
             raise ValueError(msg)
 
     return volume_element
+
+
+def validate_constituent_material_idx(constituent_material_idx):
+    """Check that a constituent_material_idx array (as defined within a volume element)
+    is an increasing range starting from zero.
+
+    Parameters
+    ----------
+    constituent_material_idx : ndarray of shape (N,) of int
+
+    """
+
+    cmi_range = np.arange(0, np.max(constituent_material_idx) + 1)
+    if np.setdiff1d(cmi_range, constituent_material_idx).size:
+        msg = (f'The unique values (material indices) in `constituent_material_idx` '
+               f'should form an integer range. This is because the distinct materials '
+               f'are defined implicitly through other index arrays in the volume '
+               f'element.')
+        raise ValueError(msg)
+
+
+def validate_material_constituent_idx(material_constituent_idx):
+    """Check that a material_constituent_idx list 
+
+    Parameters
+    ----------
+    material_constituent_idx : list of 1D ndarray of variable length of int
+        The inverse index array to the input array. The list length will be equal to
+        the number of materials.
+
+    """
+
+    # Any repeat would imply a constituent appears multiply, which we disallow:
+    mci_concat = np.sort(np.concatenate(material_constituent_idx))
+    mci_range = np.arange(0, np.max(mci_concat) + 1)
+    if not np.array_equal(mci_range, mci_concat):
+        msg = (f'All values (constituent indices) in `material_constituent_idx` '
+               f'should form an integer range. This is because the distinct constituents '
+               f'are defined implicitly through other index arrays in the volume '
+               f'element.')
+        raise ValueError(msg)
+
+
+def get_material_constituent_idx(constituent_material_idx):
+    """Get the index array that is the inverse of the constituent_material_idx
+    index array.
+
+    Parameters
+    ----------
+    constituent_material_idx : (list or ndarray of shape (N,)) of int
+        Determines the material to which each constituent belongs, where N is the
+        number of constituents.
+
+    Returns
+    -------
+    material_constituent_idx : list of 1D ndarray of variable length of int
+        The inverse index array to the input array. The list length will be equal to
+        the number of materials.
+
+    """
+
+    validate_constituent_material_idx(constituent_material_idx)
+    material_constituent_idx = []
+    for mat_idx in np.unique(constituent_material_idx):
+        mat_const_idx_i = np.where(np.isin(constituent_material_idx, mat_idx))[0]
+        material_constituent_idx.append(mat_const_idx_i)
+
+    return material_constituent_idx
+
+
+def get_constituent_material_idx(material_constituent_idx):
+    """Get the index array that is the inverse of the material_constituent_idx
+    index list.
+
+    Parameters
+    ----------
+    material_constituent_idx : list of ((1D ndarray or list) of variable length) of int
+        The inverse index array to the input array. The list length will be equal to
+        the number of materials.
+
+    Returns
+    -------
+    constituent_material_idx : (list or ndarray of shape (N,)) of int
+        Determines the material to which each constituent belongs, where N is the
+        number of constituents.
+
+    """
+
+    validate_material_constituent_idx(material_constituent_idx)
+
+    num_const = np.max(np.concatenate(material_constituent_idx))
+    constituent_material_idx = np.ones(num_const + 1) * np.nan
+    for mat_idx, const_idx in enumerate(material_constituent_idx):
+        constituent_material_idx[const_idx] = mat_idx
+
+    constituent_material_idx = constituent_material_idx.astype(int)
+
+    return constituent_material_idx
