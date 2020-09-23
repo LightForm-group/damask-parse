@@ -481,7 +481,7 @@ def euler2quat(euler_angles):
     return quats
 
 
-def validate_orientations(orientations, volume_element=None):
+def validate_orientations(orientations):
     """Check a set of orientations are valid, optionally with respect to a volume element.
 
     Parameters
@@ -497,12 +497,6 @@ def validate_orientations(orientations, volume_element=None):
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention (rotations are about Z, new-X, new-new-Z).
-    volume_element : dict, optional
-        If specified, check the values in `constituent_orientation_idx` are valid indices 
-        into `orientations`. Dict with the following required keys:
-            constituent_orientation_idx : ndarray of shape (N,) of int
-                Determines the orientation (as an index into `orientations`) associated
-                with each constituent, where N is the number of constituents.
 
     Returns
     -------
@@ -567,9 +561,7 @@ def validate_orientations(orientations, volume_element=None):
     return orientations_valid
 
 
-def validate_volume_element(volume_element, phases=None, homog_schemes=None,
-                            ignore_missing_elements=False,
-                            ignore_missing_constituents=False):
+def validate_volume_element(volume_element, phases=None, homog_schemes=None):
     """
 
     Parameters
@@ -598,6 +590,14 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
 
     """
 
+    ignore_missing_elements = False
+    ignore_missing_constituents = False
+
+    if 'element_material_idx' not in volume_element:
+        ignore_missing_elements = True
+    if 'constituent_material_idx' not in volume_element:
+        ignore_missing_constituents = True
+
     req = [
         'orientations',
         'constituent_material_idx',
@@ -618,6 +618,8 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
         req.remove('constituent_material_idx')
         req.remove('constituent_phase_label')
         req.remove('material_homog')
+        req.append('phase_labels')
+        req.append('homog_label')
 
     if ignore_missing_constituents:
         allowed = req
@@ -638,6 +640,52 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
         unknown_fmt = ', '.join([f'"{i}"' for i in unknown])
         msg = f'The following volume element keys are unknown: {unknown_fmt}.'
         raise ValueError(msg)
+
+    orientations = validate_orientations(volume_element['orientations'])
+    volume_element['orientations'] = orientations
+
+    if ignore_missing_constituents:
+        # Assuming a full-field model (one constituent per material), set default
+        # constituent keys.
+
+        element_material_idx = volume_element['element_material_idx']
+        num_mats = np.max(element_material_idx) + 1
+        emi_range = np.arange(0, num_mats)
+        if np.setdiff1d(emi_range, element_material_idx).size:
+            msg = (f'The unique values (material indices) in `element_material_idx` '
+                   f'should form an integer range. This is because the distinct '
+                   f'materials are defined implicitly through other index arrays in the '
+                   f'volume element.')
+            raise ValueError(msg)
+
+        num_oris = orientations['quaternions'].shape[0]
+        num_new_phases = num_mats - num_oris
+
+        if num_new_phases != len(volume_element['phase_labels'][1:]):
+            msg = (f'Invalid number of phase labels specified; the first phase label '
+                   f'should correspond to the elements for which orientations are '
+                   f'defined (of which there are {num_oris}), and the remaining phase '
+                   f'labels should be used for additional elements (of which there are '
+                   f'{num_mats - num_oris}).')
+            raise ValueError(msg)
+
+        const_phase_lab = np.array(
+            [volume_element['phase_labels'][0]] * num_oris +
+            volume_element['phase_labels'][1:]
+        )
+        additional_oris = np.tile(np.array([1, 0, 0, 0]), (num_new_phases, 1))
+        new_oris = np.vstack([orientations['quaternions'], additional_oris])
+        mat_homog = np.array([volume_element['homog_label']] * num_mats)
+
+        volume_element['constituent_material_idx'] = np.arange(0, num_mats)
+        volume_element['constituent_material_fraction'] = np.ones(num_mats)
+        volume_element['constituent_orientation_idx'] = np.arange(0, num_mats)
+        volume_element['constituent_phase_label'] = const_phase_lab
+        volume_element['orientations']['quaternions'] = new_oris
+        volume_element['material_homog'] = mat_homog
+
+        del volume_element['phase_labels']
+        del volume_element['homog_label']
 
     float_arrs = ['constituent_material_fraction']
     int_arrs = [
@@ -687,18 +735,12 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
                        f'Found lengths: {num_const} and {volume_element[key].size}.')
                 raise ValueError(msg)
 
-    orientations = validate_orientations(
-        volume_element['orientations'], volume_element=volume_element)
-    volume_element['orientations'] = orientations
-
-    # Set a default `constituent_orientation_idx`:
     if 'constituent_orientation_idx' in allowed:
-        if volume_element.get('constituent_orientation_idx') is None:
-            # Can only set default if number of orientations provided exactly matches
-            # number of constituents provided:
-            ori_type = volume_element['orientations']['type']
-            ori_arr_name = {'euler': 'euler_angles', 'quat': 'quaternions'}[ori_type]
-            num_oris = volume_element['orientations'][ori_arr_name].shape[0]
+        const_ori_idx = volume_element.get('constituent_orientation_idx')
+        if const_ori_idx is None:
+            # Set a default `constituent_orientation_idx`. Only possible if number of
+            # orientations provided exactly matches number of constituents provided:
+            num_oris = orientations['quaternions'].shape[0]
             num_const = volume_element['constituent_material_idx'].shape[0]
             if num_oris != num_const:
                 msg = (f'Cannot set default values for `constituent_orientation_idx`, '
@@ -707,6 +749,15 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
                 raise ValueError(msg)
             else:
                 volume_element['constituent_orientation_idx'] = np.arange(num_oris)
+        else:
+            # Remove non-indexed orientations:
+            const_ori_idx_uniq, const_ori_idx_inv = np.unique(
+                const_ori_idx,
+                return_inverse=True
+            )
+            oris_new = orientations['quaternions'][const_ori_idx_uniq]
+            volume_element['orientations']['quaternions'] = oris_new
+            volume_element['constituent_orientation_idx'] = const_ori_idx_inv
 
     # Provide a default `constituent_material_fraction`:
     if 'constituent_material_fraction' in allowed:
