@@ -662,17 +662,17 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None,
                        f'{new_val.ndim} dimensions.')
                 raise TypeError(msg)
             if key in float_arrs:
-                if new_val.dtype.type is not np.float_:
+                if new_val.dtype.char not in np.typecodes['AllFloat']:
                     msg = (f'Volume element key "{key}" should be a float array but has '
                            f'dtype "{new_val.dtype}".')
                     raise TypeError(msg)
             elif key in int_arrs:
-                if new_val.dtype.type is not np.int_:
+                if new_val.dtype.char not in np.typecodes['AllInteger']:
                     msg = (f'Volume element key "{key}" should be an int array but has '
                            f'dtype "{new_val.dtype}".')
                     raise TypeError(msg)
             elif key in str_arrs:
-                if new_val.dtype.type is not np.str_:
+                if new_val.dtype.char not in {'U', 'S'}:
                     msg = (f'Volume element key "{key}" should be a str array but has '
                            f'dtype "{new_val.dtype}".')
                     raise TypeError(msg)
