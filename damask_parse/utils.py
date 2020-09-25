@@ -919,7 +919,7 @@ def get_constituent_material_idx(material_constituent_idx):
     return constituent_material_idx
 
 
-def get_volume_element_materials(volume_element):
+def get_volume_element_materials(volume_element, homog_schemes=None, phases=None):
     """Get the materials list from a volume element that can be used to populate
     the "microstructures" list in a DAMASK materials.yaml file.
 
@@ -933,7 +933,11 @@ def get_volume_element_materials(volume_element):
 
     """
 
-    volume_element = validate_volume_element(volume_element)
+    volume_element = validate_volume_element(
+        volume_element,
+        homog_schemes=homog_schemes,
+        phases=phases,
+    )
 
     const_mat_idx = volume_element['constituent_material_idx']
     mat_const_idx = get_material_constituent_idx(const_mat_idx)
