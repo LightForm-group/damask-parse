@@ -346,7 +346,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     }
 
     dir_path = Path(dir_path).resolve()
-    mat_path = dir_path.joinpath('material.yaml')
+    mat_path = dir_path.joinpath(name)
     yaml = YAML()
     yaml.dump(mat_dat, mat_path)
 
