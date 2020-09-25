@@ -458,11 +458,40 @@ def read_material(path):
     Returns
     -------
     material_data : dict
-        Parsed data from the DAMASK material.yaml file.
-
-    Notes
-    -----
-    - `read_material` and `write_material` should be round-trip-able
+        Parsed data from the DAMASK material.yaml file. Keys are:
+            phases : dict
+                The "phase" dict contained within the material file.
+            homog_schemes : dict
+                The "homogenization" dict contained within the material file.
+            volume_element : dict            
+                Dict representing the volume element. The distribution of materials
+                across the elements (i.e. keys `element_material_idx` and `grid_size`)
+                are not included, since this information is not contained in the
+                material file. With keys:
+                    constituent_material_idx : ndarray of shape (N,) of int
+                        Determines the material to which each constituent belongs, where N
+                        is the number of constituents.
+                    constituent_material_fraction: ndarray of shape (N,) of float
+                        The fraction that each constituent occupies within its respective
+                        material, where N is the number of constituents.
+                    constituent_phase_label : ndarray of shape (N,) of str
+                        Determines the phase label of each constituent, where N is the
+                        number of constituents.
+                    constituent_orientation_idx : ndarray of shape (N,) of int
+                        Determines the orientation (as an index into `orientations`)
+                        associated with each constituent, where N is the number of
+                        constituents.
+                    material_homog : ndarray of shape (M,) of str
+                        Determines the homogenization scheme (from a list of available
+                        homogenization schemes defined elsewhere) to which each material
+                        belongs, where M is the number of materials.
+                    orientations : dict, optional
+                        Dict containing the following keys:
+                            type : str
+                                Value is "quat".
+                            quaternions : ndarray of shape (R, 4) of float, optional
+                                Array of R row four-vectors of unit quaternions. Specify
+                                either `quaternions` or `euler_angles`.        
 
     """
 
