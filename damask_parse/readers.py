@@ -499,11 +499,8 @@ def read_material(path):
     material_data = {
         'volume_element': vol_elem,
         'phases': material_dat['phase'],
-        'homog_schemes': material_dat['homogenization']
+        'homog_schemes': material_dat['homogenization'],
     }
-    material_data['volume_element'] = validate_volume_element(
-        **material_data,
-        ignore_missing_elements=True
-    )
+    material_data['volume_element'] = validate_volume_element(**material_data)
 
     return material_data
