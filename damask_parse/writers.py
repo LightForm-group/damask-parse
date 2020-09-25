@@ -323,9 +323,14 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
 
     Notes
     -----
-    The input `volume_element` can be either fully specified with respect to the 
-    `constituent_*` keys or, if no `constituent_*` keys are specified, but the
-    `element_material_idx` and `grid_size` keys are specified, we assume the model to be
+    - A "material" is currently known as a "microstructure" in the DAMASK material.yml
+      file. A "material" may have multiple constituents (e.g. grains), modelled together
+      under some homogenization scheme. For a full-field simulation, there will be only
+      one constituent per "material" (and no associated homogenization).
+
+    - The input `volume_element` can be either fully specified with respect to the 
+      `constituent_*` keys or, if no `constituent_*` keys are specified, but the
+      `element_material_idx` and `grid_size` keys are specified, we assume the model to be
     a full-field model for which each material contains precisely one constituent. In this
     case the additional keys `phase_labels` and `homog_labels` must be specified. The
     number of phase labels specified should be equal to the number or orientations
