@@ -268,40 +268,40 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
                         `quaternions` or `euler_angles`. Specified as proper Euler angles
                         in the Bunge convention. (Rotations are about Z, new X,
                         new new Z.)
-            constituent_material_idx : ndarray of shape (N,) of int, optional
+            constituent_material_idx : list or ndarray of shape (N,) of int, optional
                 Determines the material to which each constituent belongs, where N is the
                 number of constituents. If `constituent_*` keys are not specified, then
                 `element_material_idx` and `grid_size` must be specified. See Notes.
-            constituent_material_fraction: ndarray of shape (N,) of float, optional
+            constituent_material_fraction: list or ndarray of shape (N,) of float, optional
                 The fraction that each constituent occupies within its respective
                 material, where N is the number of constituents. If `constituent_*` keys
                 are not specified, then `element_material_idx` and `grid_size` must be
                 specified. See Notes.
-            constituent_phase_label : ndarray of shape (N,) of str, optional
+            constituent_phase_label : list or ndarray of shape (N,) of str, optional
                 Determines the phase label of each constituent, where N is the number of
                 constituents.  If `constituent_*` keys are not specified, then
                 `element_material_idx` and `grid_size` must be specified. See Notes.
-            constituent_orientation_idx : ndarray of shape (N,) of int, optional
+            constituent_orientation_idx : list or ndarray of shape (N,) of int, optional
                 Determines the orientation (as an index into `orientations`) associated
                 with each constituent, where N is the number of constituents. If
                 `constituent_*` keys are not specified, then `element_material_idx` and
                 `grid_size` must be specified. See Notes.
-            material_homog : ndarray of shape (M,) of str, optional
+            material_homog : list or ndarray of shape (M,) of str, optional
                 Determines the homogenization scheme (from a list of available
                 homogenization schemes defined elsewhere) to which each material belongs,
                 where M is the number of materials. If `constituent_*` keys are not
                 specified, then `element_material_idx` and `grid_size` must be specified.
                 See Notes.
-            element_material_idx : ndarray of shape (P,) of int, optional
+            element_material_idx : list or ndarray of shape (P,) of int, optional
                 Determines the material to which each geometric model element belongs,
                 where P is the number of elements. If `constituent_*` keys are not
                 specified, then `element_material_idx` and `grid_size` must be specified.
                 See Notes.
-            grid_size : ndarray of shape (3,) of int, optional
+            grid_size : list or ndarray of shape (3,) of int, optional
                 Geometric model grid dimensions. If `constituent_*` keys are not
                 specified, then `element_material_idx` and `grid_size` must be specified.
                 See Notes.
-            phase_labels : ndarray of str, optional
+            phase_labels : list or ndarray of str, optional
                 List of phase labels to associate with the constituents. Only applicable
                 if `constituent_*` keys are not specified. The first list element is the
                 phase label that will be associated with all of the geometrical elements
