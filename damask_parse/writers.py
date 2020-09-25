@@ -241,70 +241,96 @@ def write_numerics_config(dir_path, numerics):
     return numerics_path
 
 
-def write_material(homog_schemes, phases, volume_element, dir_path):
+def write_material(homog_schemes, phases, volume_element, dir_path, name='material.yaml'):
     """Write the material.yaml file for a DAMASK simulation.
 
     Parameters
     ----------
     homog_schemes : dict
         Dict whose keys are homogenization scheme labels and whose values are dicts that
-        specify the homogenization parameters for that scheme.
+        specify the homogenization parameters for that scheme. This will be passed into
+        the "homogenization" dict in the material file.
     phases : dict
         Dict whose keys are phase labels and whose values are the dicts that specify the
-        phase parameters for that phase label.
+        phase parameters for that phase label. This will be passed into the "phase" dict
+        in the material file.
     volume_element : dict
-        Dictionary that represents the volume element. Allowed keys are:
-            grid_size : list of length three
-                Size of the geometry discretization in each direction.
-            voxel_grain_idx : list of (int or (list of int))
-                A mapping that determines the grain index/indices for each voxel.
-            voxel_homogenization_idx : 3D ndarray of int
-                A mapping that determines the homogenization scheme (via an integer index)
-                for each voxel.
+        Volume element data to include in the material file. Allowed keys are:
             orientations : dict
                 Dict containing the following keys:
-                    euler_angles : ndarray of shape (N, 3)
-                        Array of N row vectors of Euler angles.
-                    euler_angle_labels : list of str
-                        Labels of the Euler angles.
-            grain_phase_label_idx : 1D ndarray of int
-                Zero-indexed integer index array mapping a grain to its phase.
-            grain_orientation_idx : 1D ndarray of int
-                Zero-indexed integer index array mapping a grain to its orientation.
-            phase_labels : ndarray of str
-                String array of phase labels.
-            orientation_coordinate_system : dict, optional
-                This dict allows assigning orientation coordinate system directions to
-                sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
-                'RD', 'TD' and 'ND'.
-            model_coordinate_system : dict, optional
-                This dict allows assigning model geometry coordinate system directions to
-                sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
-                'RD', 'TD' and 'ND'.
+                    type : str
+                        One of "euler", "quat".
+                    quaternions : ndarray of shape (R, 4) of float, optional
+                        Array of R row four-vectors of unit quaternions. Specify either
+                        `quaternions` or `euler_angles`.
+                    euler_angles : ndarray of shape (R, 3) of float, optional            
+                        Array of R row three-vectors of Euler angles. Specify either
+                        `quaternions` or `euler_angles`. Specified as proper Euler angles
+                        in the Bunge convention. (Rotations are about Z, new X,
+                        new new Z.)
+            constituent_material_idx : ndarray of shape (N,) of int, optional
+                Determines the material to which each constituent belongs, where N is the
+                number of constituents. If `constituent_*` keys are not specified, then
+                `element_material_idx` and `grid_size` must be specified. See Notes.
+            constituent_material_fraction: ndarray of shape (N,) of float, optional
+                The fraction that each constituent occupies within its respective
+                material, where N is the number of constituents. If `constituent_*` keys
+                are not specified, then `element_material_idx` and `grid_size` must be
+                specified. See Notes.
+            constituent_phase_label : ndarray of shape (N,) of str, optional
+                Determines the phase label of each constituent, where N is the number of
+                constituents.  If `constituent_*` keys are not specified, then
+                `element_material_idx` and `grid_size` must be specified. See Notes.
+            constituent_orientation_idx : ndarray of shape (N,) of int, optional
+                Determines the orientation (as an index into `orientations`) associated
+                with each constituent, where N is the number of constituents. If
+                `constituent_*` keys are not specified, then `element_material_idx` and
+                `grid_size` must be specified. See Notes.
+            material_homog : ndarray of shape (M,) of str, optional
+                Determines the homogenization scheme (from a list of available
+                homogenization schemes defined elsewhere) to which each material belongs,
+                where M is the number of materials. If `constituent_*` keys are not
+                specified, then `element_material_idx` and `grid_size` must be specified.
+                See Notes.
+            element_material_idx : ndarray of shape (P,) of int, optional
+                Determines the material to which each geometric model element belongs,
+                where P is the number of elements. If `constituent_*` keys are not
+                specified, then `element_material_idx` and `grid_size` must be specified.
+                See Notes.
+            grid_size : ndarray of shape (3,) of int, optional
+                Geometric model grid dimensions. If `constituent_*` keys are not
+                specified, then `element_material_idx` and `grid_size` must be specified.
+                See Notes.
+            phase_labels : ndarray of str, optional
+                List of phase labels to associate with the constituents. Only applicable
+                if `constituent_*` keys are not specified. The first list element is the
+                phase label that will be associated with all of the geometrical elements
+                for which an orientation is also specified. Additional list elements are
+                phase labels for geometrical elements for which no orientations are
+                specified.
+            homog_label : str, optional
+                The homogenization scheme label to use for all materials in the volume
+                element. Only applicable if `constituent_*` keys are not specified.
     dir_path : str or Path
         Directory in which to generate the material.yaml file.
-
-    --------------------------------------------------------------------------------------
-    homog_labels : list of str, optional
-        List of homogenization scheme labels that maps a homogenization scheme from
-        `homog_schemes` to a homogenization index (which is defined on each volume element
-        voxel.) The list should be the same length as the number of homogenization schemes
-        defined in the volume_element (i.e. the number of unique indices in the
-        `voxel_homogenization_idx` array of the volume element). If not specified, there
-        must be only one homogenization scheme in `homog_schemes`.
-    texture_alignment_method : str, optional
-        Applicable only if `volume_element` is specified. Either "axes_keyword" or
-        "rotation". If both the orientation coordinate system and the model coordinate
-        system are, within the volume element, defined and distinct, this specifies how
-        the two should be aligned. If "axes_keyword", the DAMASK "axes" key will be used;
-        if "rotation", the euler angles will be directly rotated. By default,
-        "axes_keyword".
-
+    name : str, optional
+        Name of material file to write. By default, set to "material.yaml".
 
     Returns
     -------
     mat_path : Path
         Path of the generated material.yaml file.
+
+    Notes
+    -----
+    The input `volume_element` can be either fully specified with respect to the 
+    `constituent_*` keys or, if no `constituent_*` keys are specified, but the
+    `element_material_idx` and `grid_size` keys are specified, we assume the model to be
+    a full-field model for which each material contains precisely one constituent. In this
+    case the additional keys `phase_labels` and `homog_labels` must be specified. The
+    number of phase labels specified should be equal to the number or orientations
+    specified plus the total number of any additional material indices in
+    "element_material_idx" for which there are no orientations.
 
     """
 

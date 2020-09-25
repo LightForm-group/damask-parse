@@ -569,26 +569,43 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
     volume_element : dict
     phases : dict
     homog_schemes : dict
-    ignore_missing_elements : bool, optional
-        If True, ignore missing `element_material_idx` and `grid_size`, which are used to
-        determine to which material each geometric model element belongs and the volume
-        element discretisation dimensions.
-    ignore_missing_constituents : bool, optional
-        If True, ignore missing keys: `constituent_material_idx`,
-        `constituent_phase_label`, `material_homog`, `constituent_material_fraction`,
-        `constituent_orientation_idx`. These keys are used to determine how constituents
-        (e.g. grains) are distributed among the different "materials", which are indexed
-        in `element_material_idx`. If True, default values of these keys will be set,
-        assuming that each material has just one constituent (with no/trivial
-        homogenization).
 
-    Notes
-    -----
-    - If phases (homog_schemes), check against vol_elem.             
-    - if no constituent data, assume one constituent per "material", populate the
-      constituent data, and assume orientations should match constituents 1-to-1.
+    Returns
+    -------
+    volume_element : dict
+        Dict with keys:
+            constituent_material_idx : ndarray of shape (N,) of int
+                Determines the material to which each constituent belongs, where N is the
+                number of constituents.
+            constituent_material_fraction: ndarray of shape (N,) of float
+                The fraction that each constituent occupies within its respective
+                material, where N is the number of constituents.
+            constituent_phase_label : ndarray of shape (N,) of str
+                Determines the phase label of each constituent, where N is the number of
+                constituents.
+            constituent_orientation_idx : ndarray of shape (N,) of int
+                Determines the orientation (as an index into `orientations`) associated
+                with each constituent, where N is the number of constituents.
+            material_homog : ndarray of shape (M,) of str
+                Determines the homogenization scheme (from a list of available
+                homogenization schemes defined elsewhere) to which each material belongs,
+                where M is the number of materials.
+            element_material_idx : ndarray of shape (P,) of int, optional
+                Determines the material to which each geometric model element belongs,
+                where P is the number of elements.
+            grid_size : ndarray of shape (3,) of int, optional
+                Geometric model grid dimensions.
+            orientations : dict, optional
+                Dict containing the following keys:
+                    type : str
+                        Value is "quat".
+                    quaternions : ndarray of shape (R, 4) of float, optional
+                        Array of R row four-vectors of unit quanternions. Specify either
+                        `quaternions` or `euler_angles`.
 
     """
+
+    volume_element = copy.deepcopy(volume_element)
 
     ignore_missing_elements = False
     ignore_missing_constituents = False
