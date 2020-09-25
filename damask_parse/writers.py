@@ -7,8 +7,12 @@ from collections import OrderedDict
 import numpy as np
 from ruamel.yaml import YAML
 
-from damask_parse.utils import zeropad, format_1D_masked_array, align_orientations
-
+from damask_parse.utils import (
+    zeropad,
+    format_1D_masked_array,
+    align_orientations,
+    get_volume_element_materials,
+)
 
 __all__ = [
     'write_geom',
@@ -235,3 +239,89 @@ def write_numerics_config(dir_path, numerics):
             handle.write(f'{key:<30} {val}')
 
     return numerics_path
+
+
+def write_material(homog_schemes, phases, volume_element, dir_path):
+    """Write the material.yaml file for a DAMASK simulation.
+
+    Parameters
+    ----------
+    homog_schemes : dict
+        Dict whose keys are homogenization scheme labels and whose values are dicts that
+        specify the homogenization parameters for that scheme.
+    phases : dict
+        Dict whose keys are phase labels and whose values are the dicts that specify the
+        phase parameters for that phase label.
+    volume_element : dict
+        Dictionary that represents the volume element. Allowed keys are:
+            grid_size : list of length three
+                Size of the geometry discretization in each direction.
+            voxel_grain_idx : list of (int or (list of int))
+                A mapping that determines the grain index/indices for each voxel.
+            voxel_homogenization_idx : 3D ndarray of int
+                A mapping that determines the homogenization scheme (via an integer index)
+                for each voxel.
+            orientations : dict
+                Dict containing the following keys:
+                    euler_angles : ndarray of shape (N, 3)
+                        Array of N row vectors of Euler angles.
+                    euler_angle_labels : list of str
+                        Labels of the Euler angles.
+            grain_phase_label_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a grain to its phase.
+            grain_orientation_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a grain to its orientation.
+            phase_labels : ndarray of str
+                String array of phase labels.
+            orientation_coordinate_system : dict, optional
+                This dict allows assigning orientation coordinate system directions to
+                sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
+                'RD', 'TD' and 'ND'.
+            model_coordinate_system : dict, optional
+                This dict allows assigning model geometry coordinate system directions to
+                sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
+                'RD', 'TD' and 'ND'.
+    dir_path : str or Path
+        Directory in which to generate the material.yaml file.
+
+    --------------------------------------------------------------------------------------
+    homog_labels : list of str, optional
+        List of homogenization scheme labels that maps a homogenization scheme from
+        `homog_schemes` to a homogenization index (which is defined on each volume element
+        voxel.) The list should be the same length as the number of homogenization schemes
+        defined in the volume_element (i.e. the number of unique indices in the
+        `voxel_homogenization_idx` array of the volume element). If not specified, there
+        must be only one homogenization scheme in `homog_schemes`.
+    texture_alignment_method : str, optional
+        Applicable only if `volume_element` is specified. Either "axes_keyword" or
+        "rotation". If both the orientation coordinate system and the model coordinate
+        system are, within the volume element, defined and distinct, this specifies how
+        the two should be aligned. If "axes_keyword", the DAMASK "axes" key will be used;
+        if "rotation", the euler angles will be directly rotated. By default,
+        "axes_keyword".
+
+
+    Returns
+    -------
+    mat_path : Path
+        Path of the generated material.yaml file.
+
+    """
+
+    microstructures = get_volume_element_materials(
+        volume_element,
+        homog_schemes=homog_schemes,
+        phases=phases,
+    )
+    mat_dat = {
+        'phase': phases,
+        'homogenization': homog_schemes,
+        'microstructure': microstructures,
+    }
+
+    dir_path = Path(dir_path).resolve()
+    mat_path = dir_path.joinpath('material.yaml')
+    yaml = YAML()
+    yaml.dump(mat_dat, mat_path)
+
+    return mat_path
