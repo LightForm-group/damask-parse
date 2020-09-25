@@ -802,6 +802,22 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                    f' does not index into `material_homog` with length {num_mats}.')
             raise ValueError(msg)
 
+    if homog_schemes:
+        # Check material homogenization scheme labels exist in `homog_schemes`:
+        for mat_idx, mat_i_homog in enumerate(volume_element['material_homog']):
+            if str(mat_i_homog) not in homog_schemes:
+                msg = (f'Homogenization scheme for material index {mat_idx} '
+                       f'("{mat_i_homog}") is not present in `homog_schemes`.')
+                raise ValueError(msg)
+
+    if phases:
+        # Check constituent phase labels exist in `phases`:
+        for const_idx, cons_i_phase in enumerate(volume_element['constituent_phase_label']):
+            if str(cons_i_phase) not in phases:
+                msg = (f'Phase for constituent index {const_idx} ("{cons_i_phase}") is '
+                       f'not present in `phases`.')
+                raise ValueError(msg)
+
     return volume_element
 
 
