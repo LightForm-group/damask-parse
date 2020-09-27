@@ -150,11 +150,18 @@ def parse_microstructure(ms_str):
                 Zero-indexed integer index array of phases.
             texture_idx : ndarray of int
                 Zero-indexed integer index array of orientations.
-            fraction : ndarray of float                
+            fraction : ndarray of float
+
+    Notes
+    -----
+    This should work for microstructure parts generated from geom_fromVoronoi in DAMASK
+    version 2 and 3. In version 3, the vestigial "crystallite 1" in each microstructure
+    section is omitted.
+
     """
 
-    pat = (r'\[[G|g]rain(\d+)\][\s\S]crystallite\s(\d+)[\s\S]\(constituent\)\s+phase\s+'
-           r'(\d+)\s+texture\s+(\d+)\s+fraction\s+(\d\.\d+)')
+    pat = (r'\[[G|g]rain(\d+)\][\s\S](?:crystallite\s(?:\d+)[\s\S])?\(constituent\)\s+'
+           r'phase\s+(\d+)\s+texture\s+(\d+)\s+fraction\s+(\d\.\d+)')
     matches = re.findall(pat, ms_str)
     if not matches:
         raise ValueError('No DAMASK microstructure part found in the string.')
@@ -163,9 +170,9 @@ def parse_microstructure(ms_str):
     texture_idx = []
     fraction = []
     for i in matches:
-        phase_idx.append(int(i[2]))
-        texture_idx.append(int(i[3]))
-        fraction.append(float(i[4]))
+        phase_idx.append(int(i[1]))
+        texture_idx.append(int(i[2]))
+        fraction.append(float(i[3]))
 
     microstructure = {
         'phase_idx': np.array(phase_idx) - 1,
