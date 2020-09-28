@@ -13,6 +13,7 @@ from damask_parse.utils import (
     get_num_header_lines,
     get_HDF5_incremental_quantity,
     validate_volume_element,
+    validate_element_material_idx,
 )
 from damask_parse.legacy.readers import parse_microstructure, parse_texture_gauss
 
@@ -22,6 +23,7 @@ __all__ = [
     'read_spectral_stderr',
     'read_HDF5_file',
     'read_material',
+    'geom_to_volume_element',
 ]
 
 
@@ -153,7 +155,7 @@ def read_geom(geom_path):
     -------
     geometry : dict
         Dictionary of the parsed data from the geometry file, with keys:
-            element_material_idx : 1D ndarray of int
+            element_material_idx : ndarray of shape equal to `grid_size` of int
                 A mapping that determines the grain index for each voxel.
             grid_size : ndarray of int of size 3
                 Resolution of volume element discretisation in each direction.
@@ -186,11 +188,11 @@ def read_geom(geom_path):
 
         lines = handle.read()
 
-        grid = None
+        grid_size = None
         grid_pat = r'grid\s+a\s+(\d+)\s+b\s+(\d+)\s+c\s+(\d+)'
         grid_match = re.search(grid_pat, lines)
         if grid_match:
-            grid = [int(i) for i in grid_match.groups()]
+            grid_size = [int(i) for i in grid_match.groups()]
         else:
             raise ValueError('`grid` not specified in file.')
 
@@ -200,7 +202,7 @@ def read_geom(geom_path):
             if ln_idx > num_header:
                 element_material_idx.extend([int(i) for i in ln_split])
 
-        element_material_idx = np.array(element_material_idx).reshape(grid[::-1])
+        element_material_idx = np.array(element_material_idx).reshape(grid_size[::-1])
         element_material_idx = element_material_idx.swapaxes(0, 2)
         element_material_idx -= 1  # zero-indexed
         num_mats = validate_element_material_idx(element_material_idx)
@@ -255,7 +257,7 @@ def read_geom(geom_path):
         commands = re.findall(com_pat, lines)
 
         geometry = {
-            'grid': grid,
+            'grid_size': grid_size,
             'size': size,
             'origin': origin,
             'orientations': orientations,
@@ -534,3 +536,44 @@ def read_material(path):
     material_data['volume_element'] = validate_volume_element(**material_data)
 
     return material_data
+
+
+def geom_to_volume_element(geom_path, phase_labels, homog_label):
+    """Read a DAMASK geom file and parse to a volume element.
+
+    Parameters
+    ----------
+    geom_path : str or Path
+        Path to the DAMASK geometry file. The geom file must include texture and
+        microstructure parts in its header.
+    phase_labels : list or ndarray of str, optional
+        List of phase labels to associate with the constituents. The first list element is
+        the phase label that will be associated with all of the geometrical elements
+        for which an orientation is also specified. Additional list elements are
+        phase labels for geometrical elements for which no orientations are
+        specified. For instance, if the DAMASK command `geom_canvas` was used on
+        a geom file to generate a new geom file that included additional material indices,
+        the phases assigned to those additional material indices would be specified as
+        additional list elements in `phase_labels`.
+    homog_label : str, optional
+        The homogenization scheme label to use for all materials in the volume element. 
+
+    Returns
+    -------
+    volume_element : dict
+
+    """
+
+    geom_dat = read_geom(geom_path)
+    volume_element = {
+        'orientations': {
+            'type': 'euler',
+            'euler_angles': geom_dat['orientations']['euler_angles'],
+        },
+        'element_material_idx': geom_dat['element_material_idx'],
+        'grid_size': geom_dat['grid_size'],
+        'phase_labels': phase_labels,
+        'homog_label': homog_label,
+    }
+    volume_element = validate_volume_element(volume_element)
+    return volume_element

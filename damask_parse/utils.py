@@ -590,7 +590,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                 Determines the homogenization scheme (from a list of available
                 homogenization schemes defined elsewhere) to which each material belongs,
                 where M is the number of materials.
-            element_material_idx : ndarray of shape (P,) of int, optional
+            element_material_idx : ndarray of shape equal to `grid_size` of int, optional
                 Determines the material to which each geometric model element belongs,
                 where P is the number of elements.
             grid_size : ndarray of shape (3,) of int, optional
@@ -665,16 +665,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         # Assuming a full-field model (one constituent per material), set default
         # constituent keys.
 
-        element_material_idx = volume_element['element_material_idx']
-        num_mats = np.max(element_material_idx) + 1
-        emi_range = np.arange(0, num_mats)
-        if np.setdiff1d(emi_range, element_material_idx).size:
-            msg = (f'The unique values (material indices) in `element_material_idx` '
-                   f'should form an integer range. This is because the distinct '
-                   f'materials are defined implicitly through other index arrays in the '
-                   f'volume element.')
-            raise ValueError(msg)
-
+        num_mats = validate_element_material_idx(volume_element['element_material_idx'])
         num_oris = orientations['quaternions'].shape[0]
         num_new_phases = num_mats - num_oris
 
@@ -722,10 +713,17 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         # Convert lists to arrays and check dtypes:
         if key in arr_keys:
             new_val = np.array(volume_element[key])
-            if new_val.ndim != 1:
-                msg = (f'Volume element key "{key}" should be a 1D array but has '
-                       f'{new_val.ndim} dimensions.')
-                raise TypeError(msg)
+            if key == 'element_material_idx':
+                grid_size = volume_element['grid_size']
+                if new_val.shape != tuple(volume_element['grid_size']):
+                    msg = (f'Volume element key "{key}" should have shape {grid_size}, '
+                           f'but has shape: {new_val.shape}.')
+                    raise ValueError(msg)
+            else:
+                if new_val.ndim != 1:
+                    msg = (f'Volume element key "{key}" should be a 1D array but has '
+                           f'{new_val.ndim} dimensions.')
+                    raise TypeError(msg)
             if key in float_arrs:
                 if new_val.dtype.char not in np.typecodes['AllFloat']:
                     msg = (f'Volume element key "{key}" should be a float array but has '
@@ -806,7 +804,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         num_elems = volume_element['element_material_idx'].size
         grid_size_prod = np.prod(volume_element['grid_size'])
         if grid_size_prod != num_elems:
-            msg = (f'Number of elements in volume element (i.e. length of array '
+            msg = (f'Number of elements in volume element (i.e. size of array '
                    f'`element_material_idx`, ({num_elems}), should match the product of '
                    f'`grid_size` ({volume_element["grid_size"]}, {grid_size_prod}).')
             raise ValueError(msg)
@@ -979,3 +977,16 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
         })
 
     return materials
+
+
+def validate_element_material_idx(element_material_idx):
+    num_mats = np.max(element_material_idx) + 1
+    emi_range = np.arange(0, num_mats)
+    if np.setdiff1d(emi_range, element_material_idx).size:
+        msg = (f'The unique values (material indices) in `element_material_idx` '
+               f'should form an integer range. This is because the distinct '
+               f'materials are defined implicitly through other index arrays in the '
+               f'volume element.')
+        raise ValueError(msg)
+
+    return num_mats
