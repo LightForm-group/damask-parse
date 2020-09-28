@@ -12,6 +12,7 @@ from damask_parse.utils import (
     format_1D_masked_array,
     align_orientations,
     get_volume_element_materials,
+    validate_volume_element,
 )
 
 __all__ = [
@@ -29,15 +30,13 @@ def write_geom(volume_element, geom_path):
     ----------
     volume_element : dict
         Dict that represents the specification of a volume element, with keys:
-            grid_size : list of length three
-            voxel_grain_idx : nested list or 3D ndarray of int
-                A mapping that determines the grain index for each voxel.
-            voxel_homogenization_idx : nested list or 3D ndarray of int, optional
-                A mapping that determines the homogenization scheme (via an integer index)
-                for each voxel. Currently, only one homogenization index is supported. If
-                not specified, the default of 0 is used.
+            element_material_idx : ndarray of shape equal to `grid_size` of int, optional
+                Determines the material to which each geometric model element belongs,
+                where P is the number of elements.
+            grid_size : ndarray of shape (3,) of int, optional
+                Geometric model grid dimensions.
             size : list of length three, optional
-                Volume element size. By default set to unit size: [1, 1, 1].
+                Volume element size. By default set to unit size: [1.0, 1.0, 1.0].
             origin : list of length three, optional
                 Volume element origin. By default: [0, 0, 0].
     geom_path : str or Path
@@ -55,40 +54,31 @@ def write_geom(volume_element, geom_path):
 
     """
 
-    voxel_grain_idx = volume_element['voxel_grain_idx']
-    if isinstance(voxel_grain_idx, list):
-        voxel_grain_idx = np.array(voxel_grain_idx)
+    volume_element = validate_volume_element(volume_element)
+    element_material_idx = volume_element['element_material_idx']
 
-    grid = voxel_grain_idx.shape
-    grain_idx_2d = np.concatenate(voxel_grain_idx.swapaxes(0, 2))
-    ve_size = volume_element.get('size', [1, 1, 1])
+    grid_size = element_material_idx.shape
+    ve_size = volume_element.get('size', [1.0, 1.0, 1.0])
     ve_origin = volume_element.get('origin', [0.0, 0.0, 0.0])
-    num_micros = np.max(grain_idx_2d) + 1  # `grain_idx_2d` is zero-indexed
-
-    # For now, only a single homogenization is supported:
-    homog_idx_uniq = np.unique(volume_element.get('voxel_homogenization_idx', 0))
-    if homog_idx_uniq.size > 1:
-        msg = (f'Only one homogenization is currently supported, but the volume element '
-               f'has these multiple unique homogenization indices '
-               f'(zero-indexed): {homog_idx_uniq}.')
-        raise NotImplementedError(msg)
-    else:
-        homog_idx = homog_idx_uniq[0] + 1  # needs to be one-indexed
+    num_micros = np.max(element_material_idx) + 1  # element_material_idx is zero-indexed
 
     header_lns = [
-        f'grid a {grid[0]} b {grid[1]} c {grid[2]}',
+        f'grid a {grid_size[0]} b {grid_size[1]} c {grid_size[2]}',
         f'size x {ve_size[0]} y {ve_size[1]} z {ve_size[2]}',
         f'origin x {ve_origin[0]} y {ve_origin[1]} z {ve_origin[2]}',
         f'microstructures {num_micros}',
-        f'homogenization {homog_idx}',
+        f'homogenization 1',
     ]
     num_header_lns = len(header_lns)
     header = f'{num_header_lns} header\n' + '\n'.join(header_lns) + '\n'
 
+    elem_mat_idx_2D = np.concatenate(element_material_idx.swapaxes(0, 2))
+    elem_mat_idx_2D += 1  # one-indexed
+
     arr_str = ''
-    for row in grain_idx_2d:
+    for row in elem_mat_idx_2D:
         for col in row:
-            arr_str += '{:<5d}'.format(col + 1)  # needs to be one-indexed
+            arr_str += '{:<5d}'.format(col)
         arr_str += '\n'
 
     geom_path = Path(geom_path)
