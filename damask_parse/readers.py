@@ -151,31 +151,29 @@ def read_geom(geom_path):
 
     Returns
     -------
-    volume_element : dict
-        Dictionary that represents the volume element parsed from the geometry
-        file, with keys:
-            voxel_grain_idx : 3D ndarray of int
+    geometry : dict
+        Dictionary of the parsed data from the geometry file, with keys:
+            element_material_idx : 1D ndarray of int
                 A mapping that determines the grain index for each voxel.
-            voxel_homogenization_idx : 3D ndarray of int
-                A mapping that determines the homogenization scheme (via an integer index)
-                for each voxel.
-            size : list of length three, optional
+            grid_size : ndarray of int of size 3
+                Resolution of volume element discretisation in each direction.
+            size : list of length 3
                 Volume element size. By default set to unit size: [1, 1, 1].
-            origin : list of length three, optional
-                Volume element origin. By default: [0, 0, 0].
-            grid : ndarray of int of size 3
-                Resolution of volume element discretisation in each direction. This will
-                equivalent to the shape of `voxel_grain_idx`.
+            origin : list of length 3
+                Volume element origin. By default: [0, 0, 0].                
+            material_homog_idx : 1D ndarray of str
+                Determines the homogenization scheme for each material.
             orientations : dict
                 Dict containing the following keys:
-                    euler_angles : ndarray of shape (N, 3)
-                        Array of N row vectors of Euler angles.
-                    euler_angle_labels : list of str
-                        Labels of the Euler angles.
-            grain_phase_label_idx : 1D ndarray of int
-                Zero-indexed integer index array mapping a grain to its phase.
-            grain_orientation_idx : 1D ndarray of int
-                Zero-indexed integer index array mapping a grain to its orientation.
+                    euler_angles : ndarray of shape (R, 3) of float
+                        Array of R row three-vectors of Euler angles. Specified as proper
+                        Euler angles in the Bunge convention. (Rotations are about Z,
+                        new X, new new Z.)
+            constituent_phase_label_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a constituent to its phase index.
+            constituent_orientation_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a constituent to its orientation
+                index.
             meta : dict
                 Any meta information associated with the generation of this volume
                 element.
@@ -196,24 +194,26 @@ def read_geom(geom_path):
         else:
             raise ValueError('`grid` not specified in file.')
 
-        grain_idx_2d = np.zeros((grid[1] * grid[2], grid[0]), dtype=int)
+        element_material_idx = []
         for ln_idx, ln in enumerate(lines.splitlines()):
             ln_split = ln.strip().split()
             if ln_idx > num_header:
-                arr_idx = ln_idx - (num_header + 1)
-                grain_idx_2d[arr_idx] = [int(i) for i in ln_split]
-        voxel_grain_idx = grain_idx_2d.reshape(grid[::-1]).swapaxes(0, 2)
-        voxel_grain_idx -= 1  # zero-indexed
+                element_material_idx.extend([int(i) for i in ln_split])
 
-        grain_phase_label_idx = None
-        grain_orientation_idx = None
+        element_material_idx = np.array(element_material_idx).reshape(grid[::-1])
+        element_material_idx = element_material_idx.swapaxes(0, 2)
+        element_material_idx -= 1  # zero-indexed
+        num_mats = validate_element_material_idx(element_material_idx)
+
+        constituent_phase_label_idx = None
+        constituent_orientation_idx = None
         pat = r'\<microstructure\>[\s\S]*\(constituent\).*'
         ms_match = re.search(pat, lines)
         if ms_match:
             ms_str = ms_match.group()
             microstructure = parse_microstructure(ms_str)
-            grain_phase_label_idx = microstructure['phase_idx']
-            grain_orientation_idx = microstructure['texture_idx']
+            constituent_phase_label_idx = microstructure['phase_idx']
+            constituent_orientation_idx = microstructure['texture_idx']
 
         orientations = None
         pat = r'\<texture\>[\s\S]*\(gauss\).*'
@@ -222,12 +222,12 @@ def read_geom(geom_path):
             texture_str = texture_match.group()
             orientations = parse_texture_gauss(texture_str)
 
-        # Check indices in `grain_orientation_idx` are valid, given `orientations`:
+        # Check indices in `constituent_orientation_idx` are valid, given `orientations`:
         if (
-            np.min(grain_orientation_idx) < 0 or
-            np.max(grain_orientation_idx) > len(orientations['euler_angles'])
+            np.min(constituent_orientation_idx) < 0 or
+            np.max(constituent_orientation_idx) > len(orientations['euler_angles'])
         ):
-            msg = 'Orientation indices in `grain_orientation_idx` are invalid.'
+            msg = 'Orientation indices in `constituent_orientation_idx` are invalid.'
             raise ValueError(msg)
 
         # Parse header information:
@@ -245,30 +245,31 @@ def read_geom(geom_path):
 
         homo_pat = r'homogenization\s+(\d+)'
         homo_match = re.search(homo_pat, lines)
-        vox_homo = None
+        material_homog_idx = None
         if homo_match:
-            vox_homo = np.zeros_like(voxel_grain_idx).astype(int)
-            vox_homo[:] = int(homo_match.group(1)) - 1  # zero-indexed
+            # Same homogenization for each material ID:
+            homog_idx = int(homo_match.group(1)) - 1  # zero-indexed
+            material_homog_idx = np.zeros(num_mats).astype(int) + homog_idx
 
         com_pat = r'(geom_.*)'
         commands = re.findall(com_pat, lines)
 
-        volume_element = {
+        geometry = {
             'grid': grid,
             'size': size,
             'origin': origin,
             'orientations': orientations,
-            'voxel_grain_idx': voxel_grain_idx,
-            'voxel_homogenization_idx': vox_homo,
-            'grain_phase_label_idx': grain_phase_label_idx,
-            'grain_orientation_idx': grain_orientation_idx,
+            'element_material_idx': element_material_idx,
+            'material_homog_idx': material_homog_idx,
+            'constituent_phase_label_idx': constituent_phase_label_idx,
+            'constituent_orientation_idx': constituent_orientation_idx,
             'meta': {
                 'num_header': num_header,
                 'commands': commands,
             },
         }
 
-    return volume_element
+    return geometry
 
 
 def read_spectral_stdout(path):
