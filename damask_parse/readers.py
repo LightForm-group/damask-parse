@@ -5,7 +5,6 @@ from pathlib import Path
 import pandas
 import re
 import numpy as np
-from damask import DADF5
 from ruamel.yaml import YAML
 
 from damask_parse.utils import (
@@ -398,13 +397,13 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
         Dict with keys determined by the `incremental_data` list.
 
     """
-
-    sim_data = DADF5(hdf5_path)
+    from damask import Result
+    sim_data = Result(hdf5_path)
 
     for op in operations or []:
         func = getattr(sim_data, op['name'], None)
         if not func:
-            raise AttributeError(f'The DADF5 object has no attribute: {op["name"]}.')
+            raise AttributeError(f'The Result object has no attribute: {op["name"]}.')
         else:
             func(**op['args'])
 

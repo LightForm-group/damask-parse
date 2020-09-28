@@ -259,8 +259,8 @@ def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     return damask_spectral_info
 
 
-def volume_element_from_2D_microstructure(microstructure_image, depth=1,
-                                          image_axes=['y', 'x']):
+def volume_element_from_2D_microstructure(microstructure_image, phase_label, homog_label,
+                                          depth=1, image_axes=['y', 'x']):
     """Extrude a 2D microstructure by a given depth to form a 3D volume element.
 
     Parameters
@@ -271,6 +271,9 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1,
                 2D map of grain indices.
             orientations : ndarray of shape (P, 3)
                 Euler angles for each grain.
+    phase_label : str
+    homog_label : str
+        Homogenization scheme label.
     depth : int, optional
         By how many voxels the microstructure should be extruded. By default, 1.
 
@@ -295,16 +298,22 @@ def volume_element_from_2D_microstructure(microstructure_image, depth=1,
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
 
+    # zero-indexed (TODO: check this is always necessary or move somewhere else?):
+    grain_idx -= 1
+
     volume_element = {
         'size': [i/depth for i in grain_idx.shape],
-        'grid': grain_idx.shape,
+        'grid_size': grain_idx.shape,
         'orientations': {
+            'type': 'euler',
             'euler_angles': microstructure_image['orientations'],
-            'euler_angle_labels': ['phi1', 'Phi', 'phi2'],
         },
-        'voxel_grain_idx': grain_idx,
-        'grain_orientation_idx': np.arange(grain_idx.max() + 1),
+        'element_material_idx': grain_idx,
+        'phase_labels': [phase_label],
+        'homog_label': homog_label,
     }
+    volume_element = validate_volume_element(volume_element)
+
     return volume_element
 
 
@@ -639,12 +648,14 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         req.append('homog_label')
 
     if ignore_missing_constituents:
-        allowed = req
+        allowed = list(req)
     else:
         allowed = req + [
             'constituent_material_fraction',  # default value can be set
             'constituent_orientation_idx',    # default value can be set (sometimes)
         ]
+
+    allowed += ['size', 'origin']
 
     missing = set(req) - set(volume_element)
     if missing:
@@ -982,11 +993,12 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
 def validate_element_material_idx(element_material_idx):
     num_mats = np.max(element_material_idx) + 1
     emi_range = np.arange(0, num_mats)
-    if np.setdiff1d(emi_range, element_material_idx).size:
+    set_diff = np.setdiff1d(emi_range, element_material_idx)
+    if set_diff.size:
         msg = (f'The unique values (material indices) in `element_material_idx` '
                f'should form an integer range. This is because the distinct '
                f'materials are defined implicitly through other index arrays in the '
-               f'volume element.')
+               f'volume element. Found missing material indices:\n{set_diff}')
         raise ValueError(msg)
 
     return num_mats
