@@ -10,6 +10,7 @@ from damask_parse.utils import zeropad, align_orientations
 
 __all__ = [
     'write_material_config',
+    'write_numerics_config',
 ]
 
 
@@ -268,3 +269,30 @@ def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
         handle.write('\n'.join(mat_conf_lns) + '\n')
 
     return mat_conf_path
+
+
+def write_numerics_config(dir_path, numerics):
+    """Write the optional numerics.config file for a DAMASK simulation.
+
+    Parameters
+    ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
+    numerics : dict
+        Dict of key-value pairs to write into the file.
+
+    Returns
+    -------
+    numerics_path : Path
+        File path to the generated numerics.config file.
+
+    """
+
+    dir_path = Path(dir_path).resolve()
+    numerics_path = dir_path.joinpath('numerics.config')
+
+    with numerics_path.open('w') as handle:
+        for key, val in numerics.items():
+            handle.write(f'{key:<30} {val}')
+
+    return numerics_path

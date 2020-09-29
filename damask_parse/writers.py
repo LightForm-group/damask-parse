@@ -18,7 +18,7 @@ from damask_parse.utils import (
 __all__ = [
     'write_geom',
     'write_material',
-    'write_numerics_config',
+    'write_numerics',
     'write_load_case',
 ]
 
@@ -204,33 +204,6 @@ def write_load_case(load_path, load_cases):
     return load_path
 
 
-def write_numerics_config(dir_path, numerics):
-    """Write the optional numerics.config file for a DAMASK simulation.
-
-    Parameters
-    ----------
-    dir_path : str or Path
-        Directory in which to generate the file(s).
-    numerics : dict
-        Dict of key-value pairs to write into the file.
-
-    Returns
-    -------
-    numerics_path : Path
-        File path to the generated numerics.config file.
-
-    """
-
-    dir_path = Path(dir_path).resolve()
-    numerics_path = dir_path.joinpath('numerics.config')
-
-    with numerics_path.open('w') as handle:
-        for key, val in numerics.items():
-            handle.write(f'{key:<30} {val}')
-
-    return numerics_path
-
-
 def write_material(homog_schemes, phases, volume_element, dir_path, name='material.yaml'):
     """Write the material.yaml file for a DAMASK simulation.
 
@@ -346,3 +319,30 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     yaml.dump(mat_dat, mat_path)
 
     return mat_path
+
+
+def write_numerics(dir_path, numerics, name='numerics.yaml'):
+    """Write the optional numerics.yaml file for a DAMASK simulation.
+
+    Parameters
+    ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
+    numerics : dict
+        Dict of key-value pairs to write into the file.
+    name : str, optional
+        Name of numerics file to write. By default, set to "numerics.yaml".        
+
+    Returns
+    -------
+    numerics_path : Path
+        File path to the generated numerics.yaml file.
+
+    """
+
+    dir_path = Path(dir_path).resolve()
+    numerics_path = dir_path.joinpath(name)
+    yaml = YAML()
+    yaml.dump(numerics, numerics_path)
+
+    return numerics_path
