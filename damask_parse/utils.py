@@ -428,7 +428,7 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
     with h5py.File(str(hdf5_path), 'r') as f:
 
         incs = [i for i in f.keys() if 'inc' in i]
-        incs = sorted(incs, key=lambda i: int(re.search('\d+', i).group()))
+        incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
         data = np.array([f[i][dat_path][()] for i in incs])[::increments]
 
         if transforms:
