@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.2.0] - 2020.09.29
+
+### Changed
+
+- Now supports new material.yaml file format used by DAMASK v3.
+- Older functionality has been be moved to a sub-package `legacy`.
+
 ## [0.1.15] - 2020.08.25
 
 ### Added
