@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.2.1] - 2020.09.29
+
+### Fixed
+
+- Fix order of extracted incremental data in `get_HDF5_incremental_quantity` for DAMASK version 3, where `incxxx` is no longer zero-padded.
+- Add `write_numerics` and move `write_numerics_config` to `legacy` sub-package.
+
 ## [0.2.0] - 2020.09.29
 
 ### Changed
