@@ -225,7 +225,7 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
     return True
 
 
-def format_1D_masked_array(arr, fmt='{:g}', fill_symbol='*'):
+def format_1D_masked_array(arr, fmt='{:.10g}', fill_symbol='*'):
     'Also formats non-masked array.'
 
     arr_fmt = ''
