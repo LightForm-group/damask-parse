@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.2] - 2020.10.01
+
+### Fixed
+
+- Function `write_load_case` now uses the general format code, `.10g` (rather than fixed floating point, `.10f`). This means the load case file is less likely to go over the 256-character limit that is currently imposed by DAMASK.
+
 ## [0.2.1] - 2020.09.29
 
 ### Fixed
