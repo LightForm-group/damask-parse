@@ -161,7 +161,7 @@ def read_geom(geom_path):
             size : list of length 3
                 Volume element size. By default set to unit size: [1, 1, 1].
             origin : list of length 3
-                Volume element origin. By default: [0, 0, 0].                
+                Volume element origin. By default: [0, 0, 0].
             material_homog_idx : 1D ndarray of str
                 Determines the homogenization scheme for each material.
             orientations : dict
@@ -224,7 +224,7 @@ def read_geom(geom_path):
             orientations = parse_texture_gauss(texture_str)
 
         # Check indices in `constituent_orientation_idx` are valid, given `orientations`:
-        if (
+        if ms_match and (
             np.min(constituent_orientation_idx) < 0 or
             np.max(constituent_orientation_idx) > len(orientations['euler_angles'])
         ):
@@ -455,7 +455,7 @@ def read_material(path):
     Parameters
     ----------
     path : str or Path
-        Path to the DAMASK material.yaml file.    
+        Path to the DAMASK material.yaml file.
 
     Returns
     -------
@@ -465,7 +465,7 @@ def read_material(path):
                 The "phase" dict contained within the material file.
             homog_schemes : dict
                 The "homogenization" dict contained within the material file.
-            volume_element : dict            
+            volume_element : dict
                 Dict representing the volume element. The distribution of materials
                 across the elements (i.e. keys `element_material_idx` and `grid_size`)
                 are not included, since this information is not contained in the
@@ -493,7 +493,7 @@ def read_material(path):
                                 Value is "quat".
                             quaternions : ndarray of shape (R, 4) of float, optional
                                 Array of R row four-vectors of unit quaternions. Specify
-                                either `quaternions` or `euler_angles`.        
+                                either `quaternions` or `euler_angles`.
 
     """
 
