@@ -537,14 +537,14 @@ def read_material(path):
     return material_data
 
 
-def geom_to_volume_element(geom_path, phase_labels, homog_label):
+def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=None):
     """Read a DAMASK geom file and parse to a volume element.
 
     Parameters
     ----------
     geom_path : str or Path
         Path to the DAMASK geometry file. The geom file must include texture and
-        microstructure parts in its header.
+        microstructure parts in its header if `orientations` is None.
     phase_labels : list or ndarray of str, optional
         List of phase labels to associate with the constituents. The first list element is
         the phase label that will be associated with all of the geometrical elements
@@ -555,7 +555,10 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label):
         the phases assigned to those additional material indices would be specified as
         additional list elements in `phase_labels`.
     homog_label : str, optional
-        The homogenization scheme label to use for all materials in the volume element. 
+        The homogenization scheme label to use for all materials in the volume element.
+    orientations : list or ndarray of shape (R, 3) of float
+        Euler angles to use if geometry file at `geom_path` does not include texture/
+        microstructure parts.
 
     Returns
     -------
@@ -564,13 +567,20 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label):
     """
 
     geom_dat = read_geom(geom_path)
+
+    if orientations is not None:
+        euler_angles = orientations
+    else:
+        euler_angles = geom_dat['orientations']['euler_angles']
+
     volume_element = {
         'orientations': {
             'type': 'euler',
-            'euler_angles': geom_dat['orientations']['euler_angles'],
+            'euler_angles': euler_angles,
         },
         'element_material_idx': geom_dat['element_material_idx'],
         'grid_size': geom_dat['grid_size'],
+        'size': geom_dat['size'],
         'phase_labels': phase_labels,
         'homog_label': homog_label,
     }
