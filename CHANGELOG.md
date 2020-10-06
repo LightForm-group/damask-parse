@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.3] - 2020.10.06
+
+### Changed
+
+- Separate orientations (Euler angles) can now be passed into `geom_to_volume_element`. This can be used if the geometry file does not contain a header with microstructure/texture information.
+
 ## [0.2.2] - 2020.10.01
 
 ### Fixed
