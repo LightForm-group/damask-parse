@@ -232,7 +232,8 @@ def read_geom(geom_path):
             raise ValueError(msg)
 
         # Parse header information:
-        size_pat = r'size\s+x\s+(\d+\.\d+)\s+y\s+(\d+\.\d+)\s+z\s+(\d+\.\d+)'
+        size_pat = (r'size\s+x\s+(\d+(?:\.\d+)*)'
+                    r'\s+y\s+(\d+(?:\.\d+)*)\s+z\s+(\d+(?:\.\d+)*)')
         size_match = re.search(size_pat, lines)
         size = None
         if size_match:
