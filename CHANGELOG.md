@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.4] - 2020.12.16
+
+### Changed
+
+- Return `orientations` from `read_geom` in a way consistent with `orientations` in other functions.
+
 ## [0.2.3] - 2020.10.06
 
 ### Changed
