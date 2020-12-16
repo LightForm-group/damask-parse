@@ -221,7 +221,12 @@ def read_geom(geom_path):
         texture_match = re.search(pat, lines)
         if texture_match:
             texture_str = texture_match.group()
-            orientations = parse_texture_gauss(texture_str)
+            texture_gauss = parse_texture_gauss(texture_str)
+            orientations = {
+                'type': 'euler',
+                'euler_angles': texture_gauss['euler_angles'],
+                'euler_angle_labels': texture_gauss['euler_angle_labels'],
+            }
 
         # Check indices in `constituent_orientation_idx` are valid, given `orientations`:
         if ms_match and (
@@ -557,9 +562,18 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
         additional list elements in `phase_labels`.
     homog_label : str, optional
         The homogenization scheme label to use for all materials in the volume element.
-    orientations : list or ndarray of shape (R, 3) of float
-        Euler angles to use if geometry file at `geom_path` does not include texture/
-        microstructure parts.
+    orientations : dict, optional
+        If specified, use these orientations instead of those that might be specified in
+        the geometry file. Dict containing the following keys:
+            type : str
+                One of "euler", "quat".
+            quaternions : (list or ndarray of shape (R, 4)) of float, optional
+                Array of R row four-vectors of unit quaternions. Specify either
+                `quaternions` or `euler_angles`.
+            euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
+                Array of R row three-vectors of Euler angles. Specify either `quaternions`
+                or `euler_angles`. Specified as proper Euler angles in the Bunge
+                convention (rotations are about Z, new-X, new-new-Z).        
 
     Returns
     -------
@@ -568,17 +582,8 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
     """
 
     geom_dat = read_geom(geom_path)
-
-    if orientations is not None:
-        euler_angles = orientations
-    else:
-        euler_angles = geom_dat['orientations']['euler_angles']
-
     volume_element = {
-        'orientations': {
-            'type': 'euler',
-            'euler_angles': euler_angles,
-        },
+        'orientations': orientations or geom_dat['orientations'],
         'element_material_idx': geom_dat['element_material_idx'],
         'grid_size': geom_dat['grid_size'],
         'size': geom_dat['size'],
