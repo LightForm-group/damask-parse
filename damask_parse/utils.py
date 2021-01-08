@@ -9,6 +9,7 @@ import numpy as np
 import h5py
 
 from damask_parse.rotation import rot_mat2euler, euler2rot_mat_n
+from damask_parse.quats import euler2quat, axang2quat, multiply_quaternions
 
 
 def zeropad(num, largest):
@@ -439,56 +440,6 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
                     data = np.sum(data, i['sum_along_axes'])
 
         return data
-
-
-def euler2quat(euler_angles):
-    """Convert Bunge-convention Euler angles to unit quaternions.
-
-    Parameters
-    ----------
-    euler_angles : ndarray of shape (N, 3) of float
-        Array of N row three-vectors of Euler angles, specified as proper Euler angles in
-        the Bunge convention (rotations are about Z, new X, new new Z).
-
-    Returns
-    -------
-    quats : ndarray of shape (N, 4) of float
-        Array of N row four-vectors of unit quaternions.
-
-    Notes
-    -----
-    Conversion of Bunge Euler angles to quaternions due to Ref. [1].
-
-    References
-    ----------
-    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
-        P J Konijnenberg, and M De Graef. "Consistent Representations
-        of and Conversions between 3D Rotations". Modelling and Simulation
-        in Materials Science and Engineering 23, no. 8 (1 December 2015):
-        083501. https://doi.org/10.1088/0965-0393/23/8/083501.            
-
-    """
-
-    phi_1 = euler_angles[:, 0]
-    Phi = euler_angles[:, 1]
-    phi_2 = euler_angles[:, 2]
-
-    sigma = 0.5 * (phi_1 + phi_2)
-    delta = 0.5 * (phi_1 - phi_2)
-    c = np.cos(Phi / 2)
-    s = np.sin(Phi / 2)
-
-    quats = np.array([
-        +c * np.cos(sigma),
-        -s * np.cos(delta),
-        -s * np.sin(delta),
-        -c * np.sin(sigma),
-    ]).T
-
-    # Move to northern hemisphere:
-    quats[quats[:, 0] < 0] *= -1
-
-    return quats
 
 
 def validate_orientations(orientations):
