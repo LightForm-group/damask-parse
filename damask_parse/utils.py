@@ -442,11 +442,11 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
 
 
 def euler2quat(euler_angles):
-    """Conver Bunge-convention Eueler angles to unit quaternions.
+    """Convert Bunge-convention Euler angles to unit quaternions.
 
     Parameters
     ----------
-    euler_angles : ndarry of shape (N, 3) of float
+    euler_angles : ndarray of shape (N, 3) of float
         Array of N row three-vectors of Euler angles, specified as proper Euler angles in
         the Bunge convention (rotations are about Z, new X, new new Z).
 
