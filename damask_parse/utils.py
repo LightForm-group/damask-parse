@@ -458,6 +458,8 @@ def validate_orientations(orientations):
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention (rotations are about Z, new-X, new-new-Z).
+            unit_cell_alignment : dict
+                Alignment of the unit cell.
 
     Returns
     -------
@@ -478,6 +480,12 @@ def validate_orientations(orientations):
     ori_type = orientations.get('type')
     eulers = orientations.get('euler_angles')
     quats = orientations.get('quaternions')
+    alignment = orientations.get('unit_cell_alignment')
+
+    if not alignment:
+        msg = (f'Alignment of the unit cell must be specified as a dict '
+               f'`unit_cell_alignment`.')
+        raise ValueError(msg)
 
     if ori_type not in ['euler', 'quat']:
         msg = f'Specify orientation `type` as either "euler" or "quat".'
@@ -517,6 +525,7 @@ def validate_orientations(orientations):
     orientations_valid = {
         'type': 'quat',
         'quaternions': quaternions,
+        'unit_cell_alignment': alignment,
     }
 
     return orientations_valid
@@ -563,6 +572,8 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                     quaternions : ndarray of shape (R, 4) of float, optional
                         Array of R row four-vectors of unit quanternions. Specify either
                         `quaternions` or `euler_angles`.
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
 
     """
 
@@ -927,16 +938,42 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
 
     materials = []
     for mat_idx, mat_i_const_idx in enumerate(mat_const_idx):
+
+        mat_i_constituents = []
+        for const_idx in mat_i_const_idx:
+            mat_i_const_j_phase = str(const_phase_lab[const_idx])
+            mat_i_const_j_ori = [float(i) for i in all_quats[const_ori_idx[const_idx]]]
+
+            if phases[mat_i_const_j_phase]['lattice'] == 'hex':
+
+                if 'unit_cell_alignment' not in volume_element['orientations']:
+                    msg = 'Orientation `unit_cell_alignment` must be specified.'
+                    raise ValueError(msg)
+
+                if volume_element['orientations']['unit_cell_alignment']['y'] == 'b':
+                    # Convert from y//b to x//a:
+                    hex_transform_quat = axang2quat(np.array([0, 0, 1]), -np.pi/6)
+                    mat_i_const_j_ori = multiply_quaternions(
+                        hex_transform_quat,
+                        np.array(mat_i_const_j_ori)
+                    ).tolist()
+
+                elif volume_element['orientations']['unit_cell_alignment'].get('x') != 'a':
+                    msg = (f'Cannot convert from the following specified unit cell '
+                           f'alignment to DAMASK-compatible unit cell alignment (x//a): '
+                           f'{volume_element["orientations"]["unit_cell_alignment"]}')
+                    NotImplementedError(msg)
+
+            mat_i_const_j = {
+                'fraction': float(const_mat_frac[const_idx]),
+                'orientation': mat_i_const_j_ori,
+                'phase': mat_i_const_j_phase,
+            }
+            mat_i_constituents.append(mat_i_const_j)
+
         materials.append({
             'homogenization': str(volume_element['material_homog'][mat_idx]),
-            'constituents': [
-                {
-                    'fraction': float(const_mat_frac[const_idx]),
-                    'orientation': [float(i) for i in all_quats[const_ori_idx[const_idx]]],
-                    'phase': str(const_phase_lab[const_idx]),
-                }
-                for const_idx in mat_i_const_idx
-            ]
+            'constituents': mat_i_constituents,
         })
 
     return materials

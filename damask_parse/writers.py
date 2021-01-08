@@ -231,6 +231,8 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
                         `quaternions` or `euler_angles`. Specified as proper Euler angles
                         in the Bunge convention. (Rotations are about Z, new X,
                         new new Z.)
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
             constituent_material_idx : list or ndarray of shape (N,) of int, optional
                 Determines the material to which each constituent belongs, where N is the
                 number of constituents. If `constituent_*` keys are not specified, then
