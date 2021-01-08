@@ -281,11 +281,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     Returns
     -------
     volume_element : dict
-        Dict with the following keys:
-            voxel_grain_idx : ndarray of shape (depth, N, M)
-            grain_orientation_idx : ndarray of int
-            size: tuple of length three
-            orientations : ndarray of shape (P, 3)
+        Dict representation of a volume element, as returned by `validate_volume_element`.
 
     """
 
