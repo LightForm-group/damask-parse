@@ -6,6 +6,11 @@
 
 - Return `orientations` from `read_geom` in a way consistent with `orientations` in other functions.
 
+### Fixed
+
+- Fix case where default geom size and origin values are not used in `write_geom`.
+- Correctly parse geom file size header information, whether specified as integer or floating point.
+
 ## [0.2.3] - 2020.10.06
 
 ### Changed
