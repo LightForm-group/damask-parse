@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.5] - 2020.01.xx
+
+### Changed 
+
+- Require `unit_cell_alignment` dict (e.g. `{'x': 'a', 'z': 'c'}`) in `orientations` dict to more explicitly account for different unit cell alignment conventions. (DAMASK uses x parallel to a for hexagonal systems.)
+
 ## [0.2.4] - 2020.12.16
 
 ### Changed
