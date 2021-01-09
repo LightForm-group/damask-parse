@@ -46,6 +46,7 @@ setup(
         'pandas',
         'h5py',
         'damask',
+        'ruamel.yaml',
     ],
     project_urls={
         'Github': 'https://github.com/LightForm-group/damask-parse',

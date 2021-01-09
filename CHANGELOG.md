@@ -1,5 +1,48 @@
 # Change Log
 
+## [0.2.5] - 2020.01.xx
+
+### Changed 
+
+- Require `unit_cell_alignment` dict (e.g. `{'x': 'a', 'z': 'c'}`) in `orientations` dict to more explicitly account for different unit cell alignment conventions. (DAMASK uses x parallel to a for hexagonal systems.)
+
+## [0.2.4] - 2020.12.16
+
+### Changed
+
+- Return `orientations` from `read_geom` in a way consistent with `orientations` in other functions.
+
+### Fixed
+
+- Fix case where default geom size and origin values are not used in `write_geom`.
+- Correctly parse geom file size header information, whether specified as integer or floating point.
+
+## [0.2.3] - 2020.10.06
+
+### Changed
+
+- Separate orientations (Euler angles) can now be passed into `geom_to_volume_element`. This can be used if the geometry file does not contain a header with microstructure/texture information.
+
+## [0.2.2] - 2020.10.01
+
+### Fixed
+
+- Function `write_load_case` now uses the general format code, `.10g` (rather than fixed floating point, `.10f`). This means the load case file is less likely to go over the 256-character limit that is currently imposed by DAMASK.
+
+## [0.2.1] - 2020.09.29
+
+### Fixed
+
+- Fix order of extracted incremental data in `get_HDF5_incremental_quantity` for DAMASK version 3, where `incxxx` is no longer zero-padded.
+- Add `write_numerics` and move `write_numerics_config` to `legacy` sub-package.
+
+## [0.2.0] - 2020.09.29
+
+### Changed
+
+- Now supports new material.yaml file format used by DAMASK v3.
+- Older functionality has been be moved to a sub-package `legacy`.
+
 ## [0.1.15] - 2020.08.25
 
 ### Added

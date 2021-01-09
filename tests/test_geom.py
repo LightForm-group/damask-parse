@@ -10,7 +10,7 @@ from unittest import TestCase
 import numpy as np
 
 from damask_parse.utils import (
-    check_volume_elements_equal, validate_volume_element
+    check_volume_elements_equal, validate_volume_element_OLD
 )
 
 
@@ -22,7 +22,7 @@ class VolumeElementTestCase(TestCase):
 
         vol_elem = {}
         with self.assertRaises(ValueError):
-            validate_volume_element(vol_elem)
+            validate_volume_element_OLD(vol_elem)
 
     def test_validation_unknown_key(self):
         """Test error raised on unknown key."""
@@ -32,7 +32,7 @@ class VolumeElementTestCase(TestCase):
             'bad_key': 1,
         }
         with self.assertRaises(ValueError):
-            validate_volume_element(vol_elem)
+            validate_volume_element_OLD(vol_elem)
 
     def test_validation_grain_idx_value(self):
         """Test error raised on incorrect `grain_idx` dimension."""
@@ -41,7 +41,7 @@ class VolumeElementTestCase(TestCase):
             'grain_idx': np.random.randint(0, 9, (2, 2))
         }
         with self.assertRaises(ValueError):
-            validate_volume_element(vol_elem)
+            validate_volume_element_OLD(vol_elem)
 
     def test_equality_true_grain_idx(self):
         """Test `check_volume_elements_equal` returns True for volume elements
