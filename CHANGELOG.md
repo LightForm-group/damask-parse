@@ -2,6 +2,10 @@
 
 ## [0.2.5] - 2020.01.xx
 
+### Added 
+
+- Add function for adding buffer material zones to a volume element: `utils.add_volume_element_buffer_zones`.
+
 ### Changed 
 
 - Require `unit_cell_alignment` dict (e.g. `{'x': 'a', 'z': 'c'}`) in `orientations` dict to more explicitly account for different unit cell alignment conventions. (DAMASK uses x parallel to a for hexagonal systems.)
