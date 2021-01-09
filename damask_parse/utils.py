@@ -298,9 +298,6 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
 
-    # zero-indexed (TODO: check this is always necessary or move somewhere else?):
-    grain_idx -= 1
-
     volume_element = {
         'size': tuple(i/depth for i in grain_idx.shape),
         'grid_size': grain_idx.shape,
