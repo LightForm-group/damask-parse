@@ -268,7 +268,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     ----------
     microstructure_image : dict
         Dict with the following keys:
-            grains : ndarray of shape (N, M)
+            grains : ndarray or nested list of shape (N, M)
                 2D map of grain indices.
             orientations : ndarray of shape (P, 3)
                 Euler angles for each grain.
@@ -294,7 +294,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     image_axes.append(3 - sum(image_axes))
 
     # extrude and then switch around the axes to x, y, z order
-    grain_idx = microstructure_image['grains'][:, :, np.newaxis]
+    grain_idx = np.array(microstructure_image['grains'])[:, :, np.newaxis]
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
 
