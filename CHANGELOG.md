@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.6] - 2020.01.10
+
+### Changed
+
+- Accept a nested list (in addition to an ndarray) for `grains` dict item in `microstructure_image` argument of `utils.volume_element_from_2D_microstructure` function.
+
 ## [0.2.5] - 2020.01.10
 
 ### Added 
