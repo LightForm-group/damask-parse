@@ -166,10 +166,13 @@ def read_geom(geom_path):
                 Determines the homogenization scheme for each material.
             orientations : dict
                 Dict containing the following keys:
+                    type : "euler"
                     euler_angles : ndarray of shape (R, 3) of float
                         Array of R row three-vectors of Euler angles. Specified as proper
                         Euler angles in the Bunge convention. (Rotations are about Z,
                         new X, new new Z.)
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
             constituent_phase_label_idx : 1D ndarray of int
                 Zero-indexed integer index array mapping a constituent to its phase index.
             constituent_orientation_idx : 1D ndarray of int
@@ -226,6 +229,10 @@ def read_geom(geom_path):
                 'type': 'euler',
                 'euler_angles': texture_gauss['euler_angles'],
                 'euler_angle_labels': texture_gauss['euler_angle_labels'],
+                'unit_cell_alignment': {
+                    'x': 'a',
+                    'z': 'c',
+                }
             }
 
         # Check indices in `constituent_orientation_idx` are valid, given `orientations`:
@@ -574,6 +581,8 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention (rotations are about Z, new-X, new-new-Z).        
+            unit_cell_alignment : dict
+                Alignment of the unit cell.
 
     Returns
     -------

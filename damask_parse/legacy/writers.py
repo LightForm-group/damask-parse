@@ -48,6 +48,8 @@ def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
                         Array of N row vectors of Euler angles.
                     euler_angle_labels : list of str
                         Labels of the Euler angles.
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
             grain_phase_label_idx : 1D ndarray of int
                 Zero-indexed integer index array mapping a grain to its phase.
             grain_orientation_idx : 1D ndarray of int
@@ -199,6 +201,13 @@ def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
     if volume_element:
 
         ori = volume_element['orientations']
+
+        if ori['unit_cell_alignment']['x'] != 'a':
+            msg = (f'Orientations unit cell alignment must be DAMASK-compatible: x '
+                   f'parallel to a, but `unit_cell_alignment` is '
+                   f'{ori["unit_cell_alignment"]}.')
+            raise NotImplementedError(msg)
+
         euler_angles = ori['euler_angles'].copy()
         axes = None
         ori_CS = volume_element.get('orientation_coordinate_system')

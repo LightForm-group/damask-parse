@@ -9,6 +9,7 @@ import numpy as np
 import h5py
 
 from damask_parse.rotation import rot_mat2euler, euler2rot_mat_n
+from damask_parse.quats import euler2quat, axang2quat, multiply_quaternions
 
 
 def zeropad(num, largest):
@@ -276,15 +277,14 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
         Homogenization scheme label.
     depth : int, optional
         By how many voxels the microstructure should be extruded. By default, 1.
+    image_axes : list, optional
+        Directions along the ndarray axes. Possible values ('x', 'y', 'z')
 
     Returns
     -------
     volume_element : dict
-        Dict with the following keys:
-            voxel_grain_idx : ndarray of shape (depth, N, M)
-            grain_orientation_idx : ndarray of int
-            size: tuple of length three
-            orientations : ndarray of shape (P, 3)
+        Dict representation of the volume element, as returned by
+        `validate_volume_element`.
 
     """
 
@@ -293,19 +293,17 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     image_axes = [conv_axis[axis] for axis in image_axes]
     image_axes.append(3 - sum(image_axes))
 
-    # extrude and then switch around the axes to x, y, z order
+    # extrude and then switch around the axes to x, y, z order
     grain_idx = microstructure_image['grains'][:, :, np.newaxis]
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
 
-    # zero-indexed (TODO: check this is always necessary or move somewhere else?):
-    grain_idx -= 1
-
     volume_element = {
-        'size': [i/depth for i in grain_idx.shape],
+        'size': tuple(i/depth for i in grain_idx.shape),
         'grid_size': grain_idx.shape,
         'orientations': {
             'type': 'euler',
+            'unit_cell_alignment': {'x': 'a'},
             'euler_angles': microstructure_image['orientations'],
         },
         'element_material_idx': grain_idx,
@@ -317,35 +315,127 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     return volume_element
 
 
-def add_volume_element_missing_texture(volume_element):
-    """Add a missing texture (orientation) to a volume element that has an extra grain
-    index in it's `voxel_grain_idx` array.
+def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, phase_labels,
+                                    order=['x', 'y', 'z']):
+    """Add buffer material regions to a volume element.
 
-    Notes
-    -----
-    This can be used after invoking DAMASK's `geom_canvas` pre-processing command.
+    Parameters
+    ----------
+    volume_element : dict
+        Dict representing the volume element that can be validated via
+        `validate_volume_element`.
+    buffer_sizes : list of int, length 6
+        Size of buffer on each face [-x, +x, -y, +y, -z, +z]
+    phase_ids : list of int, length 6
+        Phase of each buffer. Relative, so 1 is the first new phase and so on
+    phase_labels : list of str
+        Labels of the new phases
+    order : list of str, optional
+        Order to add the zones in, default [x, y, z]
+
+    Returns
+    -------
+    volume_element : dict
+        Dict representing modified volume element.
 
     """
 
-    num_grains = len(volume_element['grain_orientation_idx'])
-    max_phase_idx = np.max(volume_element['grain_phase_label_idx'])
-    max_grain_idx = np.max(volume_element['voxel_grain_idx'])  # zero-indexed
+    volume_element = validate_volume_element(volume_element)
 
-    if max_grain_idx != num_grains:
-        raise ValueError('All grains seem to have an associated texture.')
+    conv_order = {'x': 0, 'y': 1, 'z': 2}
+    order = [conv_order[axis] for axis in order]
 
-    volume_element['orientations']['euler_angles'] = np.vstack([
-        volume_element['orientations']['euler_angles'],
-        [[0.0, 0.0, 0.0]]
+    # new grid dimensions
+    grid = volume_element['grid_size']  # tuple
+    delta_grid = tuple(buffer_sizes[2*i] + buffer_sizes[2*i + 1] for i in range(3))
+    new_grid = tuple(a + b for a, b in zip(grid, delta_grid))
+
+    if 'size' in volume_element:
+        # scale size based on material added
+        new_size = tuple(s / og * ng for og, ng, s in zip(grid,
+                                                          new_grid, volume_element['size']))
+
+    # validate new phases
+    phase_ids_unq = sorted(set(pid for pid, bs in zip(phase_ids, buffer_sizes) if bs > 0))
+    if phase_ids_unq[0] != 1 and phase_ids_unq[-1] != len(phase_ids_unq):
+        raise ValueError("Issue with buffer phases.")
+    if len(phase_labels) != len(phase_ids_unq):
+        raise ValueError("Issue with buffer phase labels.")
+
+    # new phase and grain ids to add. 1 grain per phase
+    material_idx = volume_element['element_material_idx']
+    next_material_id = material_idx.max() + 1
+    next_ori_idx = volume_element['orientations']['quaternions'].shape[0]
+
+    # add a single-constituent material for each buffer phase:
+    new_material_ids = []
+    for i in range(len(phase_ids_unq)):
+        volume_element['material_homog'] = np.append(
+            volume_element['material_homog'],
+            'SX',
+        )
+        volume_element['constituent_phase_label'] = np.append(
+            volume_element['constituent_phase_label'],
+            phase_labels[i],
+        )
+        volume_element['constituent_material_fraction'] = np.append(
+            volume_element['constituent_material_fraction'],
+            1.0,
+        )
+        volume_element['constituent_material_idx'] = np.append(
+            volume_element['constituent_material_idx'],
+            next_material_id,
+        )
+        volume_element['constituent_orientation_idx'] = np.append(
+            volume_element['constituent_orientation_idx'],
+            next_ori_idx,
+        )
+        new_material_ids.append(next_material_id)
+
+        next_material_id += 1
+        next_ori_idx += 1
+
+    # add a new orientation (identity) for each new material:
+    identity_oris = np.zeros((len(phase_ids_unq), 4))
+    identity_oris[:, 0] = 1
+    volume_element['orientations']['quaternions'] = np.vstack([
+        volume_element['orientations']['quaternions'],
+        identity_oris,
     ])
-    volume_element['grain_orientation_idx'] = np.concatenate([
-        volume_element['grain_orientation_idx'],
-        [num_grains],
-    ])
-    volume_element['grain_phase_label_idx'] = np.concatenate([
-        volume_element['grain_phase_label_idx'],
-        [max_phase_idx + 1],
-    ])
+
+    # add the buffer regions
+    for axis in order:
+        if delta_grid[axis] == 0:
+            continue
+
+        new_blocks = []
+        for i in range(2):
+            buffer_size = buffer_sizes[2*axis+i]
+            if buffer_size <= 0:
+                continue
+
+            material_id = new_material_ids[phase_ids[2*axis+i] - 1]
+
+            buffer_shape = list(material_idx.shape)
+            buffer_shape[axis] = buffer_size
+
+            new_block = np.full(buffer_shape, material_id)
+            new_blocks.append(new_block)
+
+            if i == 0:
+                new_blocks.append(material_idx)
+
+        material_idx = np.concatenate(new_blocks, axis=axis)
+
+    volume_element.update(
+        grid_size=new_grid,
+        element_material_idx=material_idx,
+    )
+
+    if 'size' in volume_element:
+        volume_element.update(size=new_size)
+
+    return volume_element
 
 
 def align_orientations(ori, orientation_coordinate_system, model_coordinate_system):
@@ -441,56 +531,6 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         return data
 
 
-def euler2quat(euler_angles):
-    """Conver Bunge-convention Eueler angles to unit quaternions.
-
-    Parameters
-    ----------
-    euler_angles : ndarry of shape (N, 3) of float
-        Array of N row three-vectors of Euler angles, specified as proper Euler angles in
-        the Bunge convention (rotations are about Z, new X, new new Z).
-
-    Returns
-    -------
-    quats : ndarray of shape (N, 4) of float
-        Array of N row four-vectors of unit quaternions.
-
-    Notes
-    -----
-    Conversion of Bunge Euler angles to quaternions due to Ref. [1].
-
-    References
-    ----------
-    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
-        P J Konijnenberg, and M De Graef. "Consistent Representations
-        of and Conversions between 3D Rotations". Modelling and Simulation
-        in Materials Science and Engineering 23, no. 8 (1 December 2015):
-        083501. https://doi.org/10.1088/0965-0393/23/8/083501.            
-
-    """
-
-    phi_1 = euler_angles[:, 0]
-    Phi = euler_angles[:, 1]
-    phi_2 = euler_angles[:, 2]
-
-    sigma = 0.5 * (phi_1 + phi_2)
-    delta = 0.5 * (phi_1 - phi_2)
-    c = np.cos(Phi / 2)
-    s = np.sin(Phi / 2)
-
-    quats = np.array([
-        +c * np.cos(sigma),
-        -s * np.cos(delta),
-        -s * np.sin(delta),
-        -c * np.sin(sigma),
-    ]).T
-
-    # Move to northern hemisphere:
-    quats[quats[:, 0] < 0] *= -1
-
-    return quats
-
-
 def validate_orientations(orientations):
     """Check a set of orientations are valid, optionally with respect to a volume element.
 
@@ -507,6 +547,8 @@ def validate_orientations(orientations):
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention (rotations are about Z, new-X, new-new-Z).
+            unit_cell_alignment : dict
+                Alignment of the unit cell.
 
     Returns
     -------
@@ -527,6 +569,12 @@ def validate_orientations(orientations):
     ori_type = orientations.get('type')
     eulers = orientations.get('euler_angles')
     quats = orientations.get('quaternions')
+    alignment = orientations.get('unit_cell_alignment')
+
+    if not alignment:
+        msg = (f'Alignment of the unit cell must be specified as a dict '
+               f'`unit_cell_alignment`.')
+        raise ValueError(msg)
 
     if ori_type not in ['euler', 'quat']:
         msg = f'Specify orientation `type` as either "euler" or "quat".'
@@ -566,6 +614,7 @@ def validate_orientations(orientations):
     orientations_valid = {
         'type': 'quat',
         'quaternions': quaternions,
+        'unit_cell_alignment': alignment,
     }
 
     return orientations_valid
@@ -612,6 +661,8 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                     quaternions : ndarray of shape (R, 4) of float, optional
                         Array of R row four-vectors of unit quanternions. Specify either
                         `quaternions` or `euler_angles`.
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
 
     """
 
@@ -976,16 +1027,42 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
 
     materials = []
     for mat_idx, mat_i_const_idx in enumerate(mat_const_idx):
+
+        mat_i_constituents = []
+        for const_idx in mat_i_const_idx:
+            mat_i_const_j_phase = str(const_phase_lab[const_idx])
+            mat_i_const_j_ori = [float(i) for i in all_quats[const_ori_idx[const_idx]]]
+
+            if phases[mat_i_const_j_phase]['lattice'] == 'hex':
+
+                if 'unit_cell_alignment' not in volume_element['orientations']:
+                    msg = 'Orientation `unit_cell_alignment` must be specified.'
+                    raise ValueError(msg)
+
+                if volume_element['orientations']['unit_cell_alignment']['y'] == 'b':
+                    # Convert from y//b to x//a:
+                    hex_transform_quat = axang2quat(np.array([0, 0, 1]), -np.pi/6)
+                    mat_i_const_j_ori = multiply_quaternions(
+                        hex_transform_quat,
+                        np.array(mat_i_const_j_ori)
+                    ).tolist()
+
+                elif volume_element['orientations']['unit_cell_alignment'].get('x') != 'a':
+                    msg = (f'Cannot convert from the following specified unit cell '
+                           f'alignment to DAMASK-compatible unit cell alignment (x//a): '
+                           f'{volume_element["orientations"]["unit_cell_alignment"]}')
+                    NotImplementedError(msg)
+
+            mat_i_const_j = {
+                'fraction': float(const_mat_frac[const_idx]),
+                'orientation': mat_i_const_j_ori,
+                'phase': mat_i_const_j_phase,
+            }
+            mat_i_constituents.append(mat_i_const_j)
+
         materials.append({
             'homogenization': str(volume_element['material_homog'][mat_idx]),
-            'constituents': [
-                {
-                    'fraction': float(const_mat_frac[const_idx]),
-                    'orientation': [float(i) for i in all_quats[const_ori_idx[const_idx]]],
-                    'phase': str(const_phase_lab[const_idx]),
-                }
-                for const_idx in mat_i_const_idx
-            ]
+            'constituents': mat_i_constituents,
         })
 
     return materials
