@@ -1039,7 +1039,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
                     raise ValueError(msg)
 
-                if volume_element['orientations']['unit_cell_alignment']['y'] == 'b':
+                if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
                     # Convert from y//b to x//a:
                     hex_transform_quat = axang2quat(np.array([0, 0, 1]), -np.pi/6)
                     mat_i_const_j_ori = multiply_quaternions(
