@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.7] - 2020.01.11
+
+### Fixed
+
+- Fix bug in `unit_cell_alignment` check in  `utils.get_volume_element_materials`.
+
 ## [0.2.6] - 2020.01.10
 
 ### Changed
