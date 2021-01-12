@@ -273,6 +273,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
             orientations : ndarray of shape (P, 3)
                 Euler angles for each grain.
     phase_label : str
+        Label of the phase. Only single phase supported.
     homog_label : str
         Homogenization scheme label.
     depth : int, optional
@@ -316,7 +317,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
 
 
 def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, phase_labels,
-                                    order=['x', 'y', 'z']):
+                                    homog_label, order=['x', 'y', 'z']):
     """Add buffer material regions to a volume element.
 
     Parameters
@@ -330,6 +331,8 @@ def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, pha
         Phase of each buffer. Relative, so 1 is the first new phase and so on
     phase_labels : list of str
         Labels of the new phases
+    homog_label: str
+        Homogenization scheme label.
     order : list of str, optional
         Order to add the zones in, default [x, y, z]
 
@@ -372,7 +375,7 @@ def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, pha
     for i in range(len(phase_ids_unq)):
         volume_element['material_homog'] = np.append(
             volume_element['material_homog'],
-            'SX',
+            homog_label,
         )
         volume_element['constituent_phase_label'] = np.append(
             volume_element['constituent_phase_label'],
