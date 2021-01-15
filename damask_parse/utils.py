@@ -532,7 +532,7 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
 
 
 def validate_orientations(orientations):
-    """Check a set of orientations are valid, optionally with respect to a volume element.
+    """Check a set of orientations are valid.
 
     Parameters
     ----------
@@ -541,7 +541,7 @@ def validate_orientations(orientations):
             type : str
                 One of "euler", "quat".
             quaternions : (list or ndarray of shape (R, 4)) of float, optional
-                Array of R row four-vectors of unit quanternions. Specify either
+                Array of R row four-vectors of unit quaternions. Specify either
                 `quaternions` or `euler_angles`.
             euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
@@ -562,9 +562,6 @@ def validate_orientations(orientations):
                 Orientations represented as an array of row 4-vectors.
 
     """
-
-    # LATER: maybe need to represent as list of list of Decimal instead of float
-    # ndarray (should get around 15 dp from float) ?
 
     ori_type = orientations.get('type')
     eulers = orientations.get('euler_angles')
@@ -605,7 +602,6 @@ def validate_orientations(orientations):
                    f'array of shape (R, 4), but shape passed was: {quaternions.shape}.')
             raise ValueError(msg)
 
-    # TODO: should we check and raise if not normalised?
     norm_factor = np.sqrt(np.sum(quaternions ** 2, axis=1))
     if not np.allclose(norm_factor, 1):
         print('Quaternions are not normalised; they will be normalised.')
