@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.8] - 2020.xx.xx
+
+### Changed
+
+- Revert to `DADF5` class if no `Result` class importable within `readers.read_HDF5_file`.
+
 ## [0.2.7] - 2020.01.11
 
 ### Fixed
