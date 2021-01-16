@@ -308,6 +308,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
         volume_element,
         homog_schemes=homog_schemes,
         phases=phases,
+        P=-1,  # DAMASK uses P = -1 convention.
     )
     mat_dat = {
         'phase': phases,

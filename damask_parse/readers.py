@@ -588,10 +588,20 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
                 convention (rotations are about Z, new-X, new-new-Z).        
             unit_cell_alignment : dict
                 Alignment of the unit cell.
+            P : int, optional
+                The "P" constant, either +1 or -1, as defined within [1].                
 
     Returns
     -------
     volume_element : dict
+
+    References
+    ----------
+    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
+        P J Konijnenberg, and M De Graef. "Consistent Representations
+        of and Conversions between 3D Rotations". Modelling and Simulation
+        in Materials Science and Engineering 23, no. 8 (1 December 2015):
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.
 
     """
 
