@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.2.7] - 2020.01.11
+
+### Fixed
+
+- Fix bug in `unit_cell_alignment` check in  `utils.get_volume_element_materials`.
+
+## [0.2.6] - 2020.01.10
+
+### Changed
+
+- Accept a nested list (in addition to an ndarray) for `grains` dict item in `microstructure_image` argument of `utils.volume_element_from_2D_microstructure` function.
+
 ## [0.2.5] - 2020.01.10
 
 ### Added 

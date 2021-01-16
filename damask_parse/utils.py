@@ -268,7 +268,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     ----------
     microstructure_image : dict
         Dict with the following keys:
-            grains : ndarray of shape (N, M)
+            grains : ndarray or nested list of shape (N, M)
                 2D map of grain indices.
             orientations : ndarray of shape (P, 3)
                 Euler angles for each grain.
@@ -294,7 +294,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     image_axes.append(3 - sum(image_axes))
 
     # extrude and then switch around the axes to x, y, z order
-    grain_idx = microstructure_image['grains'][:, :, np.newaxis]
+    grain_idx = np.array(microstructure_image['grains'])[:, :, np.newaxis]
     grain_idx = np.tile(grain_idx, (1, 1, depth))
     grain_idx = np.ascontiguousarray(grain_idx.transpose(image_axes))
 
@@ -1035,7 +1035,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
                     raise ValueError(msg)
 
-                if volume_element['orientations']['unit_cell_alignment']['y'] == 'b':
+                if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
                     # Convert from y//b to x//a:
                     hex_transform_quat = axang2quat(np.array([0, 0, 1]), -np.pi/6)
                     mat_i_const_j_ori = multiply_quaternions(
