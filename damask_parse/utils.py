@@ -445,7 +445,7 @@ def align_orientations(ori, orientation_coordinate_system, model_coordinate_syst
     Parameters
     ----------
     ori : ndarray of shape (N, 3)
-        Array of row vectors representing euler angles.
+        Array of row vectors representing Euler angles in degrees.
     orientation_coordinate_system : dict
         This dict allows assigning orientation coordinate system directions to
         sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
@@ -547,10 +547,14 @@ def validate_orientations(orientations):
             P : int, optional
                 The "P" constant, either +1 or -1, as defined within [1]. If not
                 specified, P = +1 will be used.
-            euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
-                Array of R row three-vectors of Euler angles. Specify either `quaternions`
-                or `euler_angles`. Specified as proper Euler angles in the Bunge
-                convention (rotations are about Z, new-X, new-new-Z).
+            euler_angles : (list or ndarray of shape (R, 3)) of float, optional           
+                Array of R row three-vectors of Euler angles in degrees or radians,
+                as determined by `euler_degrees`. Specify either `quaternions` or
+                `euler_angles`. Specified as proper Euler angles in the Bunge
+                convention. (Rotations are about Z, new X, new new Z.)
+            euler_degrees : bool, optional
+                If True, `euler_angles` are expected in degrees, rather than
+                radians.
             unit_cell_alignment : dict
                 Alignment of the unit cell.
 
@@ -583,6 +587,7 @@ def validate_orientations(orientations):
 
     ori_type = orientations.get('type')
     eulers = orientations.get('euler_angles')
+    euler_is_degs = orientations.get('euler_degrees')
     quats = orientations.get('quaternions')
     alignment = orientations.get('unit_cell_alignment')
 
@@ -604,6 +609,11 @@ def validate_orientations(orientations):
             msg = (f'Specify orientations as an array of row three-vector Euler angles '
                    f'with the key "euler_angles".')
             raise ValueError(msg)
+        if euler_is_degs is None:
+            msg = (f'If orientations are specified as Euler angles, "euler_degrees" must '
+                   f'be specified as True or False to indicate the format of the Euler '
+                   f'angles.')
+            raise ValueError(msg)
         euler_angles = np.array(eulers)
         if euler_angles.shape[1] != 3:
             msg = (f'Euler angles specified in "euler_angles" should be a nested list or '
@@ -611,7 +621,7 @@ def validate_orientations(orientations):
             raise ValueError(msg)
 
         # Convert Euler angles to quaternions:
-        quaternions = euler2quat(euler_angles, P=P)
+        quaternions = euler2quat(euler_angles, degrees=euler_is_degs, P=P)
 
     elif ori_type == 'quat':
         if quats is None:
@@ -677,9 +687,8 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                 Dict containing the following keys:
                     type : str
                         Value is "quat".
-                    quaternions : ndarray of shape (R, 4) of float, optional
-                        Array of R row four-vectors of unit quanternions. Specify either
-                        `quaternions` or `euler_angles`.
+                    quaternions : ndarray of shape (R, 4) of float
+                        Array of R row four-vectors of unit quaternions.
                     unit_cell_alignment : dict
                         Alignment of the unit cell.                        
                     P : int

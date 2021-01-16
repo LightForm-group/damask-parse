@@ -227,10 +227,13 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
                         Array of R row four-vectors of unit quaternions. Specify either
                         `quaternions` or `euler_angles`.
                     euler_angles : ndarray of shape (R, 3) of float, optional            
-                        Array of R row three-vectors of Euler angles. Specify either
-                        `quaternions` or `euler_angles`. Specified as proper Euler angles
-                        in the Bunge convention. (Rotations are about Z, new X,
-                        new new Z.)
+                        Array of R row three-vectors of Euler angles in degrees or radians,
+                        as determined by `euler_degrees`. Specify either `quaternions` or
+                        `euler_angles`. Specified as proper Euler angles in the Bunge
+                        convention. (Rotations are about Z, new X, new new Z.)
+                    euler_degrees : bool, optional
+                        If True, `euler_angles` are expected in degrees, rather than
+                        radians.
                     unit_cell_alignment : dict
                         Alignment of the unit cell.
             constituent_material_idx : list or ndarray of shape (N,) of int, optional

@@ -3,7 +3,7 @@
 import numpy as np
 
 
-def euler2quat(euler_angles, P=1):
+def euler2quat(euler_angles, degrees=False, P=1):
     """Convert Bunge-convention Euler angles to unit quaternions.
 
     Parameters
@@ -11,6 +11,8 @@ def euler2quat(euler_angles, P=1):
     euler_angles : ndarray of shape (N, 3) of float
         Array of N row three-vectors of Euler angles, specified as proper Euler angles in
         the Bunge convention (rotations are about Z, new X, new new Z).
+    degrees : bool, optional
+        If True, `euler_angles` are expected in degrees, rather than radians.
     P : int, optional
         The "P" constant, either +1 or -1, as defined within [1].
 
@@ -35,6 +37,9 @@ def euler2quat(euler_angles, P=1):
 
     if P not in [-1, 1]:
         raise ValueError('P must be -1 or +1')
+
+    if degrees:
+        euler_angles = np.deg2rad(euler_angles)
 
     phi_1 = euler_angles[:, 0]
     Phi = euler_angles[:, 1]

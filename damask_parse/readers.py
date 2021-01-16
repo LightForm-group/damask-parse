@@ -173,6 +173,9 @@ def read_geom(geom_path):
                         new X, new new Z.)
                     unit_cell_alignment : dict
                         Alignment of the unit cell.
+                    euler_degrees : bool
+                        If True, `euler_angles` are represented in degrees, rather than
+                        radians.
             constituent_phase_label_idx : 1D ndarray of int
                 Zero-indexed integer index array mapping a constituent to its phase index.
             constituent_orientation_idx : 1D ndarray of int
@@ -228,6 +231,7 @@ def read_geom(geom_path):
             orientations = {
                 'type': 'euler',
                 'euler_angles': texture_gauss['euler_angles'],
+                'euler_degrees': texture_gauss['euler_degrees'],
                 'euler_angle_labels': texture_gauss['euler_angle_labels'],
                 'unit_cell_alignment': {
                     'x': 'a',
@@ -505,13 +509,12 @@ def read_material(path):
                         Determines the homogenization scheme (from a list of available
                         homogenization schemes defined elsewhere) to which each material
                         belongs, where M is the number of materials.
-                    orientations : dict, optional
+                    orientations : dict
                         Dict containing the following keys:
                             type : str
                                 Value is "quat".
-                            quaternions : ndarray of shape (R, 4) of float, optional
-                                Array of R row four-vectors of unit quaternions. Specify
-                                either `quaternions` or `euler_angles`.
+                            quaternions : ndarray of shape (R, 4) of float
+                                Array of R row four-vectors of unit quaternions.
 
     """
 
@@ -585,7 +588,9 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
             euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
-                convention (rotations are about Z, new-X, new-new-Z).        
+                convention (rotations are about Z, new-X, new-new-Z).
+            euler_degrees : bool, optional
+                If True, `euler_angles` are expected in degrees, rather than radians.
             unit_cell_alignment : dict
                 Alignment of the unit cell.
             P : int, optional
