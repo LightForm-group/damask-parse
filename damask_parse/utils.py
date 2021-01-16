@@ -270,8 +270,13 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
         Dict with the following keys:
             grains : ndarray or nested list of shape (N, M)
                 2D map of grain indices.
-            orientations : ndarray of shape (P, 3)
-                Euler angles for each grain.
+            orientations : dict
+                Dict with the following keys:
+                    type: str, "quat"
+                    quaternions : ndarray of shape (P, 4) of float
+                        Array of P row four-vectors of unit quaternions.   
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
     phase_label : str
     homog_label : str
         Homogenization scheme label.
@@ -301,11 +306,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     volume_element = {
         'size': tuple(i/depth for i in grain_idx.shape),
         'grid_size': grain_idx.shape,
-        'orientations': {
-            'type': 'euler',
-            'unit_cell_alignment': {'x': 'a'},
-            'euler_angles': microstructure_image['orientations'],
-        },
+        'orientations': microstructure_image['orientations'],
         'element_material_idx': grain_idx,
         'phase_labels': [phase_label],
         'homog_label': homog_label,

@@ -5,6 +5,7 @@
 ### Changed
 
 - Revert to `DADF5` class if no `Result` class importable within `readers.read_HDF5_file`.
+- Change expected format of `microstructure_image` argument in function `volume_element_from_2D_microstructure`.
 
 ## [0.2.7] - 2020.01.11
 
