@@ -31,7 +31,7 @@ def euler2quat(euler_angles, degrees=False, P=1):
         P J Konijnenberg, and M De Graef. "Consistent Representations
         of and Conversions between 3D Rotations". Modelling and Simulation
         in Materials Science and Engineering 23, no. 8 (1 December 2015):
-        083501. https://doi.org/10.1088/0965-0393/23/8/083501.             
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.
 
     """
 
