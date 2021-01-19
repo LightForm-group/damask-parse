@@ -8,6 +8,8 @@
 - Change expected format of `microstructure_image` argument in function `volume_element_from_2D_microstructure`.
 - Explicitly track "P" constant in `orientations` dict.
 - Add `euler_degrees` boolean dict item to `orientations` dict.
+- Support orientation data in `utils.get_HDF5_incremental_quantity`.
+- Add argument `homog_label` to `utils.add_volume_element_buffer_zones`.
 
 ## [0.2.7] - 2021.01.11
 
