@@ -46,6 +46,9 @@ def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
                 Dict containing the following keys:
                     euler_angles : ndarray of shape (N, 3)
                         Array of N row vectors of Euler angles.
+                    euler_degrees : bool
+                        If True, `euler_angles` are expected in degrees, rather than
+                        radians.
                     euler_angle_labels : list of str
                         Labels of the Euler angles.
                     unit_cell_alignment : dict
@@ -209,6 +212,9 @@ def write_material_config(homog_schemes, phases, dir_path, volume_element=None,
             raise NotImplementedError(msg)
 
         euler_angles = ori['euler_angles'].copy()
+        if not ori['euler_degrees']:
+            euler_angles = np.rad2deg(euler_angles)
+
         axes = None
         ori_CS = volume_element.get('orientation_coordinate_system')
         model_CS = volume_element.get('model_coordinate_system')

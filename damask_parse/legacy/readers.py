@@ -199,6 +199,8 @@ def parse_texture_gauss(texture_str):
                 Array of row vectors of Euler angles.
             euler_angle_labels : list of str
                 Labels of the Euler angles.
+            euler_degrees : bool, True
+                Signifies that `euler_angles` are represented in degrees.
             fraction : ndarray or NoneType
             scatter : ndarray or NoneType
     """
@@ -222,6 +224,7 @@ def parse_texture_gauss(texture_str):
 
     texture = {
         'euler_angles': np.array(eulers),
+        'euler_degrees': True,
         'euler_angle_labels': ['phi1', 'Phi', 'phi2'],
         'fraction': np.array(fraction) if fraction else None,
         'scatter': np.array(scatter) if scatter else None,

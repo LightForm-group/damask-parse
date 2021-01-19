@@ -270,8 +270,13 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
         Dict with the following keys:
             grains : ndarray or nested list of shape (N, M)
                 2D map of grain indices.
-            orientations : ndarray of shape (P, 3)
-                Euler angles for each grain.
+            orientations : dict
+                Dict with the following keys:
+                    type: str, "quat"
+                    quaternions : ndarray of shape (P, 4) of float
+                        Array of P row four-vectors of unit quaternions.   
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
     phase_label : str
     homog_label : str
         Homogenization scheme label.
@@ -301,11 +306,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
     volume_element = {
         'size': tuple(i/depth for i in grain_idx.shape),
         'grid_size': grain_idx.shape,
-        'orientations': {
-            'type': 'euler',
-            'unit_cell_alignment': {'x': 'a'},
-            'euler_angles': microstructure_image['orientations'],
-        },
+        'orientations': microstructure_image['orientations'],
         'element_material_idx': grain_idx,
         'phase_labels': [phase_label],
         'homog_label': homog_label,
@@ -444,7 +445,7 @@ def align_orientations(ori, orientation_coordinate_system, model_coordinate_syst
     Parameters
     ----------
     ori : ndarray of shape (N, 3)
-        Array of row vectors representing euler angles.
+        Array of row vectors representing Euler angles in degrees.
     orientation_coordinate_system : dict
         This dict allows assigning orientation coordinate system directions to
         sample directions. Allowed keys are 'x', 'y' and 'z'. Example values are
@@ -543,10 +544,17 @@ def validate_orientations(orientations):
             quaternions : (list or ndarray of shape (R, 4)) of float, optional
                 Array of R row four-vectors of unit quaternions. Specify either
                 `quaternions` or `euler_angles`.
-            euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
-                Array of R row three-vectors of Euler angles. Specify either `quaternions`
-                or `euler_angles`. Specified as proper Euler angles in the Bunge
-                convention (rotations are about Z, new-X, new-new-Z).
+            P : int, optional
+                The "P" constant, either +1 or -1, as defined within [1]. If not
+                specified, P = +1 will be used.
+            euler_angles : (list or ndarray of shape (R, 3)) of float, optional           
+                Array of R row three-vectors of Euler angles in degrees or radians,
+                as determined by `euler_degrees`. Specify either `quaternions` or
+                `euler_angles`. Specified as proper Euler angles in the Bunge
+                convention. (Rotations are about Z, new X, new new Z.)
+            euler_degrees : bool, optional
+                If True, `euler_angles` are expected in degrees, rather than
+                radians.
             unit_cell_alignment : dict
                 Alignment of the unit cell.
 
@@ -560,13 +568,32 @@ def validate_orientations(orientations):
                 Value is "quat".
             quaternions : ndarray of shape (R, 4) of float
                 Orientations represented as an array of row 4-vectors.
+            unit_cell_alignment : dict
+                Alignment of the unit cell.                
+            P : int
+                The "P" constant, either +1 or -1, as defined within [1]. If included in
+                the original `orientations` dict, this value will be unchanged. Otherwise,
+                this will be set to +1.
+
+    References
+    ----------
+    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
+        P J Konijnenberg, and M De Graef. "Consistent Representations
+        of and Conversions between 3D Rotations". Modelling and Simulation
+        in Materials Science and Engineering 23, no. 8 (1 December 2015):
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.       
 
     """
 
     ori_type = orientations.get('type')
     eulers = orientations.get('euler_angles')
+    euler_is_degs = orientations.get('euler_degrees')
     quats = orientations.get('quaternions')
     alignment = orientations.get('unit_cell_alignment')
+
+    P = orientations.get('P', 1)
+    if P not in [-1, 1]:
+        raise ValueError('If specified, `P` should be +1 or -1.')
 
     if not alignment:
         msg = (f'Alignment of the unit cell must be specified as a dict '
@@ -582,6 +609,11 @@ def validate_orientations(orientations):
             msg = (f'Specify orientations as an array of row three-vector Euler angles '
                    f'with the key "euler_angles".')
             raise ValueError(msg)
+        if euler_is_degs is None:
+            msg = (f'If orientations are specified as Euler angles, "euler_degrees" must '
+                   f'be specified as True or False to indicate the format of the Euler '
+                   f'angles.')
+            raise ValueError(msg)
         euler_angles = np.array(eulers)
         if euler_angles.shape[1] != 3:
             msg = (f'Euler angles specified in "euler_angles" should be a nested list or '
@@ -589,7 +621,7 @@ def validate_orientations(orientations):
             raise ValueError(msg)
 
         # Convert Euler angles to quaternions:
-        quaternions = euler2quat(euler_angles)
+        quaternions = euler2quat(euler_angles, degrees=euler_is_degs, P=P)
 
     elif ori_type == 'quat':
         if quats is None:
@@ -611,6 +643,7 @@ def validate_orientations(orientations):
         'type': 'quat',
         'quaternions': quaternions,
         'unit_cell_alignment': alignment,
+        'P': P,
     }
 
     return orientations_valid
@@ -654,11 +687,20 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                 Dict containing the following keys:
                     type : str
                         Value is "quat".
-                    quaternions : ndarray of shape (R, 4) of float, optional
-                        Array of R row four-vectors of unit quanternions. Specify either
-                        `quaternions` or `euler_angles`.
+                    quaternions : ndarray of shape (R, 4) of float
+                        Array of R row four-vectors of unit quaternions.
                     unit_cell_alignment : dict
-                        Alignment of the unit cell.
+                        Alignment of the unit cell.                        
+                    P : int
+                        The "P" constant, either +1 or -1, as defined within [1].
+
+    References
+    ----------
+    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
+        P J Konijnenberg, and M De Graef. "Consistent Representations
+        of and Conversions between 3D Rotations". Modelling and Simulation
+        in Materials Science and Engineering 23, no. 8 (1 December 2015):
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.                         
 
     """
 
@@ -993,17 +1035,32 @@ def get_constituent_material_idx(material_constituent_idx):
     return constituent_material_idx
 
 
-def get_volume_element_materials(volume_element, homog_schemes=None, phases=None):
+def get_volume_element_materials(volume_element, homog_schemes=None, phases=None, P=-1):
     """Get the materials list from a volume element that can be used to populate
     the "microstructures" list in a DAMASK materials.yaml file.
 
     Parameters
     ----------
     volume_element : dict
+    P : int, optional
+        The "P" constant, either +1 or -1, as defined within [1]. By default, set to -1,
+        which is what DAMASK uses. If the quaternions defined within the volume element
+        have a P that is different to this P, the quaternions as output from this 
+        function will be converted (i.e. the vector parts will be scaled by -1). Using
+        the default value here, -1, will ensure the output quaternions are suitable
+        for the DAMASK input file.
 
     Returns
     -------
     materials : list of dict
+
+    References
+    ----------
+    [1] Rowenhorst, D, A D Rollett, G S Rohrer, M Groeber, M Jackson,
+        P J Konijnenberg, and M De Graef. "Consistent Representations
+        of and Conversions between 3D Rotations". Modelling and Simulation
+        in Materials Science and Engineering 23, no. 8 (1 December 2015):
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.  
 
     """
 
@@ -1027,7 +1084,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
         mat_i_constituents = []
         for const_idx in mat_i_const_idx:
             mat_i_const_j_phase = str(const_phase_lab[const_idx])
-            mat_i_const_j_ori = [float(i) for i in all_quats[const_ori_idx[const_idx]]]
+            mat_i_const_j_ori = all_quats[const_ori_idx[const_idx]]
 
             if phases[mat_i_const_j_phase]['lattice'] == 'hex':
 
@@ -1037,11 +1094,15 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
 
                 if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
                     # Convert from y//b to x//a:
-                    hex_transform_quat = axang2quat(np.array([0, 0, 1]), -np.pi/6)
+                    hex_transform_quat = axang2quat(
+                        volume_element['orientations']['P'] * np.array([0, 0, 1]), 
+                        np.pi/6
+                    )
                     mat_i_const_j_ori = multiply_quaternions(
-                        hex_transform_quat,
-                        np.array(mat_i_const_j_ori)
-                    ).tolist()
+                        q1=hex_transform_quat,
+                        q2=mat_i_const_j_ori,
+                        P=volume_element['orientations']['P'],
+                    )
 
                 elif volume_element['orientations']['unit_cell_alignment'].get('x') != 'a':
                     msg = (f'Cannot convert from the following specified unit cell '
@@ -1049,9 +1110,14 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                            f'{volume_element["orientations"]["unit_cell_alignment"]}')
                     NotImplementedError(msg)
 
+            if volume_element['orientations']['P'] != P:
+                # Make output quaternions consistent with desired "P" convention, as
+                # determined by `P` argument:
+                mat_i_const_j_ori[1:] *= -1
+
             mat_i_const_j = {
                 'fraction': float(const_mat_frac[const_idx]),
-                'orientation': mat_i_const_j_ori,
+                'orientation': mat_i_const_j_ori.tolist(),
                 'phase': mat_i_const_j_phase,
             }
             mat_i_constituents.append(mat_i_const_j)
