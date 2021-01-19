@@ -524,7 +524,20 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
         data = np.array([f[i][dat_path][()] for i in incs])[::increments]
 
-        if transforms:
+        # flatten structured datatype for orientations
+        if dat_path.split('/')[-1] == 'O':
+            data = data.view((data.dtype[data.dtype.names[0]], len(data.dtype)))
+
+            # cast to orientation dict
+            data = {
+                'type': 'quat',
+                'quaternions': data, # P=-1 convention
+                'unit_cell_alignment': {'x': 'a'},
+                'P': -1,
+            }
+
+        # transform options don't really apply to orientations
+        elif transforms:
             for i in transforms:
                 if 'mean_along_axes' in i:
                     data = np.mean(data, i['mean_along_axes'])
