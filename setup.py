@@ -38,7 +38,7 @@ setup(
                  'plasticity code DAMASK.'),
     long_description=get_long_description(),
     long_description_content_type='text/markdown',
-    author='Adam J. Plowman',
+    author='Adam J. Plowman, Michael D. Atkinson',
     author_email='adam.plowman@manchester.ac.uk',
     packages=find_packages(),
     install_requires=[
