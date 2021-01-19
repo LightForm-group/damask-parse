@@ -278,6 +278,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
                     unit_cell_alignment : dict
                         Alignment of the unit cell.
     phase_label : str
+        Label of the phase. Only single phase supported.
     homog_label : str
         Homogenization scheme label.
     depth : int, optional
@@ -317,7 +318,7 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
 
 
 def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, phase_labels,
-                                    order=['x', 'y', 'z']):
+                                    homog_label, order=['x', 'y', 'z']):
     """Add buffer material regions to a volume element.
 
     Parameters
@@ -331,6 +332,8 @@ def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, pha
         Phase of each buffer. Relative, so 1 is the first new phase and so on
     phase_labels : list of str
         Labels of the new phases
+    homog_label: str
+        Homogenization scheme label.
     order : list of str, optional
         Order to add the zones in, default [x, y, z]
 
@@ -373,7 +376,7 @@ def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, pha
     for i in range(len(phase_ids_unq)):
         volume_element['material_homog'] = np.append(
             volume_element['material_homog'],
-            'SX',
+            homog_label,
         )
         volume_element['constituent_phase_label'] = np.append(
             volume_element['constituent_phase_label'],
@@ -522,7 +525,20 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
         data = np.array([f[i][dat_path][()] for i in incs])[::increments]
 
-        if transforms:
+        # flatten structured datatype for orientations
+        if dat_path.split('/')[-1] == 'O':
+            data = data.view((data.dtype[data.dtype.names[0]], len(data.dtype)))
+
+            # cast to orientation dict
+            data = {
+                'type': 'quat',
+                'quaternions': data, # P=-1 convention
+                'unit_cell_alignment': {'x': 'a'},
+                'P': -1,
+            }
+
+        # transform options don't really apply to orientations
+        elif transforms:
             for i in transforms:
                 if 'mean_along_axes' in i:
                     data = np.mean(data, i['mean_along_axes'])
