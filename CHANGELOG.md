@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.9] - 2021.01.25
+
+### Fixed
+
+- Allow a single orientation (Euler angle triplet or quaternion) in `utils.validate_orientations`.
+
 ## [0.2.8] - 2021.01.19
 
 ### Changed

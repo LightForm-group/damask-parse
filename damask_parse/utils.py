@@ -532,7 +532,7 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
             # cast to orientation dict
             data = {
                 'type': 'quat',
-                'quaternions': data, # P=-1 convention
+                'quaternions': data,  # P=-1 convention
                 'unit_cell_alignment': {'x': 'a'},
                 'P': -1,
             }
@@ -558,14 +558,16 @@ def validate_orientations(orientations):
             type : str
                 One of "euler", "quat".
             quaternions : (list or ndarray of shape (R, 4)) of float, optional
-                Array of R row four-vectors of unit quaternions. Specify either
-                `quaternions` or `euler_angles`.
+                Array of R row four-vectors of unit quaternions. A single quaternion in an
+                array of shape (4,) is also allowed. Specify either `quaternions` or
+                `euler_angles`.
             P : int, optional
                 The "P" constant, either +1 or -1, as defined within [1]. If not
                 specified, P = +1 will be used.
             euler_angles : (list or ndarray of shape (R, 3)) of float, optional           
                 Array of R row three-vectors of Euler angles in degrees or radians,
-                as determined by `euler_degrees`. Specify either `quaternions` or
+                as determined by `euler_degrees`. A single Euler angle triplet in an
+                array of shape (3,) is also allowed. Specify either `quaternions` or
                 `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention. (Rotations are about Z, new X, new new Z.)
             euler_degrees : bool, optional
@@ -630,8 +632,13 @@ def validate_orientations(orientations):
                    f'be specified as True or False to indicate the format of the Euler '
                    f'angles.')
             raise ValueError(msg)
+
         euler_angles = np.array(eulers)
-        if euler_angles.shape[1] != 3:
+
+        if euler_angles.shape == (3,):
+            euler_angles.reshape((1, 3))
+
+        elif euler_angles.ndim != 2 or euler_angles.shape[1] != 3:
             msg = (f'Euler angles specified in "euler_angles" should be a nested list or '
                    f'array of shape (R, 3), but shape passed was: {euler_angles.shape}.')
             raise ValueError(msg)
@@ -644,8 +651,13 @@ def validate_orientations(orientations):
             msg = (f'Specify orientations as an array of row four-vector unit '
                    f'quaternions with the key "quaternions".')
             raise ValueError(msg)
+
         quaternions = np.array(quats)
-        if quaternions.shape[1] != 4:
+
+        if quaternions.shape == (4,):
+            quaternions.reshape((1, 4))
+
+        elif quaternions.ndim != 2 or quaternions.shape[1] != 4:
             msg = (f'Quaternions specified in "quaternions" should be a nested list or '
                    f'array of shape (R, 4), but shape passed was: {quaternions.shape}.')
             raise ValueError(msg)
@@ -1111,7 +1123,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                 if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
                     # Convert from y//b to x//a:
                     hex_transform_quat = axang2quat(
-                        volume_element['orientations']['P'] * np.array([0, 0, 1]), 
+                        volume_element['orientations']['P'] * np.array([0, 0, 1]),
                         np.pi/6
                     )
                     mat_i_const_j_ori = multiply_quaternions(
