@@ -636,7 +636,7 @@ def validate_orientations(orientations):
         euler_angles = np.array(eulers)
 
         if euler_angles.shape == (3,):
-            euler_angles.reshape((1, 3))
+            euler_angles = euler_angles.reshape((1, 3))
 
         elif euler_angles.ndim != 2 or euler_angles.shape[1] != 3:
             msg = (f'Euler angles specified in "euler_angles" should be a nested list or '
@@ -655,7 +655,7 @@ def validate_orientations(orientations):
         quaternions = np.array(quats)
 
         if quaternions.shape == (4,):
-            quaternions.reshape((1, 4))
+            quaternions = quaternions.reshape((1, 4))
 
         elif quaternions.ndim != 2 or quaternions.shape[1] != 4:
             msg = (f'Quaternions specified in "quaternions" should be a nested list or '

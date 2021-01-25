@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.10] - 2021.01.25
+
+### Fixed
+
+- Fix bug introduced in v0.2.9 with reshaping orientations in `utils.validate_orientations`.
+
 ## [0.2.9] - 2021.01.25
 
 ### Fixed
