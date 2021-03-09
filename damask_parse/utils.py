@@ -548,6 +548,71 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         return data
 
 
+def get_field_data(sim_data, field_name, increments):
+    """Access data from DAMASK result object and place on the simulation grid.
+
+    Parameters
+    ----------
+    sim_data : damask.Result
+        DAMASK simulation result object.
+    field_name : str
+        Name of data to process.
+    increments : list of int
+        Increment to extract data from. wildcards/empty?
+
+    """
+    # if field_name in ['displacement', 'increments', 'phase_mapping']:
+    #     raise ValueError(f"{field_name} is a protected name.")
+
+    try:
+        cells = sim_data.cells
+        # print('cells')
+    except AttributeError:
+        cells = sim_data.grid
+        # print('grid')
+
+    field_data = []
+    incs_valid = []
+    for inc in increments:
+        inc_formatted = sim_data.incs_in_range(inc, inc)
+        if len(inc_formatted) != 1:
+            print(f"Could not find increment {inc} in output data.")
+            continue
+        incs_valid.append(inc)
+        sim_data.pick('increments', inc_formatted)
+
+        ext_data = sim_data.read_dataset(sim_data.get_dataset_location(field_name))
+        # # reshape to make x,y,z contiguous in memory (numpy row major)
+        # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
+        # ext_data = np.ascontiguousarray(
+        #     ext_data.T.reshape(ext_data.shape[1:] + tuple(cells), order='F')
+        # )
+        # or reshape to make tensor components contiguous in memory (numpy row major)
+        # dimensions: 0: x-pos, 1: y-pos, 2: z-pos 3,4: tensor components
+        ext_data = np.ascontiguousarray(
+            ext_data.reshape(tuple(cells) + ext_data.shape[1:], order='F')
+        )
+        # this seems more inline with what is already done with `incremental_data`
+        # dims (incs, spatial, tensor comps)
+
+        field_data.append(ext_data)
+
+    # convert list of array
+    # index order (incs, spatial_comps, tensor_comps)
+    return np.array(field_data), incs_valid
+
+
+def apply_grain_average(field_data, grains):
+    # grain_data
+    grain_data = []
+    for grain in np.unique(grains):
+        grain_data.append(field_data[:, grains == grain].mean(axis=1))
+    
+    # convert list of array
+    # index order (incs, grains, tensor_comps)
+    return np.array(grain_data).swapaxes(0, 1)
+
+
 def validate_orientations(orientations):
     """Check a set of orientations are valid.
 
