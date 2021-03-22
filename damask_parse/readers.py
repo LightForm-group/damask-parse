@@ -381,6 +381,7 @@ def read_spectral_stderr(path):
 
 def read_HDF5_file(
     hdf5_path,
+    geom_path=None,
     incremental_data=None,
     field_data=None,
     grain_data=None,
@@ -437,31 +438,27 @@ def read_HDF5_file(
         Dict with keys determined by the `incremental_data` list and `field_data` dict.
 
     """
-    # TODO: make better
-    geom_path = 'task_4_simulate_volume_element_loading/geom.geom'
-    import os
-    cwd = os.getcwd()
-    print('AHHAHHAHAHAHAHAHHH')
-    print(cwd)
+    if not geom_path:
+        geom_path = Path(hdf5_path).parent / 'geom.geom'
 
     # Open DAMASK output file if required
     if operations or field_data or grain_data:
         try:
             from damask import Result
-            sim_data = Result(hdf5_path)
+            sim_data = Result(str(hdf5_path))
         except ImportError:
             from damask import DADF5
-            sim_data = DADF5(hdf5_path)
+            sim_data = DADF5(str(hdf5_path))
     # Load in grain mapping if required
     if grain_data:
         try:
             from damask import Grid
-            ve = Grid.load_ASCII(geom_path)
+            ve = Grid.load_ASCII(str(geom_path))
             # 0-indexed, make 1-indexed
             grains = ve.material + 1
         except ImportError:
             from damask import Geom
-            ve = Geom.from_file(geom_path)
+            ve = Geom.from_file(str(geom_path))
             # should be 1-indexed, check
             grains = ve.microstructure
 
