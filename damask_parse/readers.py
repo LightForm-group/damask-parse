@@ -407,36 +407,19 @@ def read_HDF5_file(
                         If specified, take the mean average of the array along this axis.
             increments : int
                 Step size
-    field_data : dict, optional
-        Dictiony describing the spatial fields to extract from the simulation results. Keys:
-            fields: list of str
-                The names of datafields to extract
-            increments: list of int
-                Increments to extract data for.
-            include_phase_mapping: bool
-            include_displacement: bool
-            remove_buffer_regions: bool
-
+    field_data : list of dict, optional
         List of field data to extract. This is a list of dict with following keys:
             field_name: str
                 Name of the data field to extract
             increments: list of int
                 Increments to extract from
-        Two special keys exist, 'displacemnt' and 'phase'. 
-
-    grain_data : dict, optional
-        Dictionary describing the grain average data to extract from the simulation results. Keys:
-            fields: list of str
-                The names of datafields to extract
-            increments: list of int
-                Increments to extract data for.
-
+        Special field_name keys exist, 'displacemnt', 'grain' and 'phase'. 
+    grain_data : list of dict, optional
         List of grain data to extract. This is a list of dict with following keys:
             field_name: str
                 Name of the data field to extract
             increments: list of int
                 Increments to extract from
-        
     operations : list of dict, optional
         List of methods to invoke on the DADF5 object. This is a list of dicts with the
         following keys:
@@ -454,15 +437,33 @@ def read_HDF5_file(
         Dict with keys determined by the `incremental_data` list and `field_data` dict.
 
     """
+    # TODO: make better
+    geom_path = 'task_4_simulate_volume_element_loading/geom.geom'
+    import os
+    cwd = os.getcwd()
+    print('AHHAHHAHAHAHAHAHHH')
+    print(cwd)
 
-    try:
-        from damask import Result
-        sim_data = Result(hdf5_path)
-    except ImportError:
-        from damask import DADF5
-        sim_data = DADF5(hdf5_path)
-    import damask
-    print(damask.version)
+    # Open DAMASK output file if required
+    if operations or field_data or grain_data:
+        try:
+            from damask import Result
+            sim_data = Result(hdf5_path)
+        except ImportError:
+            from damask import DADF5
+            sim_data = DADF5(hdf5_path)
+    # Load in grain mapping if required
+    if grain_data:
+        try:
+            from damask import Grid
+            ve = Grid.load_ASCII(geom_path)
+            # 0-indexed, make 1-indexed
+            grains = ve.material + 1
+        except ImportError:
+            from damask import Geom
+            ve = Geom.from_file(geom_path)
+            # should be 1-indexed, check
+            grains = ve.microstructure
 
     for op in operations or []:
         func = getattr(sim_data, op['name'], None)
@@ -512,11 +513,9 @@ def read_HDF5_file(
                 },
             }
         })
-
-    # setup output dict with empty lists to add data to
+    
     field_response = {}
     for field_dat_spec in field_data or []:
-
         field_dat, increments = get_field_data(
             sim_data, 
             field_dat_spec['field_name'],
@@ -533,35 +532,27 @@ def read_HDF5_file(
 
         # TODO
         # phase mapping
-        # displacement
+        # grain mapping
+        # displacement -- done use u_n
 
     grain_response = {}
-    first = True
     for grain_dat_spec in grain_data or []:
-        # Load in grain mapping
-        if first:
-            try:
-                from damask import Grid
-                ve = Grid.load_ASCII(geom_path)
-                # 0-indexed, make 1-indexed
-                grains = ve.material + 1  
-            except ImportError:
-                from damask import Geom
-                ve = Geom.from_file(geom_path)
-                # should be 1-indexed, check
-                grains = ve.microstructure
-        
         # check if identical field data already exists
-
-        # else create it
-        field_dat, increments = get_field_data(
-            sim_data, 
-            grain_dat_spec['field_name'],
-            grain_dat_spec['increments']
-        )
+        if grain_dat_spec in (field_data or []):
+            field_dat = field_response[grain_dat_spec['field_name']]
+            increments = field_dat['meta']['increments']
+            field_dat = field_dat['data']
+        # otherwise create it
+        else:
+            field_dat, increments = get_field_data(
+                sim_data, 
+                grain_dat_spec['field_name'],
+                grain_dat_spec['increments']
+            )
 
         # grain average
-        grain_dat = apply_grain_average(field_dat, grains)
+        is_oris = grain_dat_spec['field_name'] == 'O'
+        grain_dat = apply_grain_average(field_dat, grains, is_oris=is_oris)
 
         grain_response.update({
             grain_dat_spec['field_name']: {

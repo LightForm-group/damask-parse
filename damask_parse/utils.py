@@ -525,17 +525,8 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
         data = np.array([f[i][dat_path][()] for i in incs])[::increments]
 
-        # flatten structured datatype for orientations
         if dat_path.split('/')[-1] == 'O':
-            data = data.view((data.dtype[data.dtype.names[0]], len(data.dtype)))
-
-            # cast to orientation dict
-            data = {
-                'type': 'quat',
-                'quaternions': data,  # P=-1 convention
-                'unit_cell_alignment': {'x': 'a'},
-                'P': -1,
-            }
+            data = process_damask_orientatons(data)
 
         # transform options don't really apply to orientations
         elif transforms:
@@ -546,6 +537,21 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
                     data = np.sum(data, i['sum_along_axes'])
 
         return data
+
+
+def process_damask_orientatons(ori_data):
+    # flatten structured datatype for orientations
+    ori_data = ori_data.view((
+        ori_data.dtype[ori_data.dtype.names[0]],
+        len(ori_data.dtype)
+    ))
+    # cast to orientation dict
+    return {
+        'type': 'quat',
+        'quaternions': ori_data,
+        'unit_cell_alignment': {'x': 'a'},
+        'P': -1,
+    }
 
 
 def get_field_data(sim_data, field_name, increments):
@@ -561,15 +567,17 @@ def get_field_data(sim_data, field_name, increments):
         Increment to extract data from. wildcards/empty?
 
     """
+    nodal_fields = ['u_n']
     # if field_name in ['displacement', 'increments', 'phase_mapping']:
     #     raise ValueError(f"{field_name} is a protected name.")
 
     try:
-        cells = sim_data.cells
-        # print('cells')
+        cells = tuple(sim_data.cells)
     except AttributeError:
-        cells = sim_data.grid
-        # print('grid')
+        cells = tuple(sim_data.grid)
+
+    if field_name in nodal_fields:
+        cells = tuple(i+1 for i in cells)
 
     field_data = []
     incs_valid = []
@@ -589,28 +597,51 @@ def get_field_data(sim_data, field_name, increments):
         # )
         # or reshape to make tensor components contiguous in memory (numpy row major)
         # dimensions: 0: x-pos, 1: y-pos, 2: z-pos 3,4: tensor components
-        ext_data = np.ascontiguousarray(
-            ext_data.reshape(tuple(cells) + ext_data.shape[1:], order='F')
-        )
+        old_shape = ext_data.shape
+        new_shape = cells
+        if len(old_shape) > 1 and old_shape[1:] != (1,):
+            new_shape += old_shape[1:]
+        ext_data = np.ascontiguousarray(ext_data.reshape(new_shape, order='F'))
         # this seems more inline with what is already done with `incremental_data`
         # dims (incs, spatial, tensor comps)
 
         field_data.append(ext_data)
 
     # convert list of array
-    # index order (incs, spatial_comps, tensor_comps)
-    return np.array(field_data), incs_valid
+    # index order (incs, spatial_comps, tensor_comps)
+    field_data = np.array(field_data)
+
+    if field_name == 'O':
+        field_data = process_damask_orientatons(field_data)
+
+    return field_data, incs_valid
 
 
-def apply_grain_average(field_data, grains):
+def apply_grain_average(field_data, grains, is_oris=False):
     # grain_data
     grain_data = []
-    for grain in np.unique(grains):
-        grain_data.append(field_data[:, grains == grain].mean(axis=1))
-    
-    # convert list of array
+    if is_oris:
+        if field_data['type'] != 'quat':
+            raise ValueError('Only quaternion orientations can be averaged.')
+        meta_data = {k: v for k, v in field_data.items() if k != 'quaternions'}
+        field_data = field_data['quaternions']
+
+        for grain in np.unique(grains):
+            grain_data.append(field_data[:, grains == grain].sum(axis=1))
+        grain_data = np.array(grain_data).swapaxes(0, 1)
+        grain_data /= np.linalg.norm(grain_data, axis=2)[..., np.newaxis]
+
+        grain_data = {
+            'quaternions': grain_data
+        }
+        grain_data.update(meta_data)
+    else:
+        for grain in np.unique(grains):
+            grain_data.append(field_data[:, grains == grain].mean(axis=1))
+        grain_data = np.array(grain_data).swapaxes(0, 1)
+        
     # index order (incs, grains, tensor_comps)
-    return np.array(grain_data).swapaxes(0, 1)
+    return grain_data
 
 
 def validate_orientations(orientations):
