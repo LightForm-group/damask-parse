@@ -532,7 +532,7 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
             # cast to orientation dict
             data = {
                 'type': 'quat',
-                'quaternions': data,  # P=-1 convention
+                'quaternions': np.around(data, decimals=30),  # P=-1 convention, ensure read <15d.p.
                 'unit_cell_alignment': {'x': 'a'},
                 'P': -1,
             }
