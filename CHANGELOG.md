@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.11] - 2021.xx.xx
+
+### Changed
+
+- Allow passing deformation gradient (rate) as a nested list to `writers.write_load_case`.
+
 ## [0.2.10] - 2021.01.25
 
 ### Fixed
