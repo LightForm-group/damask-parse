@@ -127,7 +127,8 @@ def write_load_case(load_path, load_cases):
             dg_arr = def_grad_rate
             dg_arr_sym = 'Fdot'
 
-        dg_arr = np.array(dg_arr)
+        if isinstance(dg_arr, list):
+            dg_arr = np.array(dg_arr)
 
         load_case_ln = []
 
