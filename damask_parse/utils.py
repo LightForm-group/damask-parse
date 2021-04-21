@@ -4,9 +4,11 @@ from pathlib import Path
 from subprocess import run, PIPE
 import copy
 import re
+import sys
 
 import numpy as np
 import h5py
+import ruamel.yaml
 
 from damask_parse.rotation import rot_mat2euler, euler2rot_mat_n
 from damask_parse.quats import euler2quat, axang2quat, multiply_quaternions
@@ -1170,3 +1172,48 @@ def validate_element_material_idx(element_material_idx):
         raise ValueError(msg)
 
     return num_mats
+
+
+def prepare_material_yaml_data(mat_dat):
+    """Prepare data for writing to the DAMASK material.yaml file, by choosing desired
+    formatting where necessary, including formatting quaternions to a given precision.
+
+    Parameters
+    ----------
+    mat_dat : dict 
+        Dict with keys:
+            phases
+            homogenization
+            microstructure
+
+    Returns
+    -------
+    mat_dat_fmt : dict
+        Copy of input dict, `mat_dat`, where some data has been replaced by objects
+        from ruamel.yaml to provide desired formatting.
+
+    """
+
+    ORI_NUM_DP = 15
+
+    mat_dat_fmt = copy.deepcopy(mat_dat)
+
+    for material in mat_dat_fmt['microstructure']:
+        for const in material['constituents']:
+            ori_list = []
+            for ori in const['orientation']:
+                kwargs = {
+                    'width': ORI_NUM_DP + 2,
+                    'prec': 1,
+                    'm_sign': False,
+                }
+                if ori < 0:
+                    kwargs.update({
+                        'prec': 2,
+                        'm_sign': '-',
+                        'width': kwargs['width'] + 1,
+                    })
+                ori_list.append(ruamel.yaml.scalarfloat.ScalarFloat(ori, **kwargs))
+            const['orientation'] = ori_list
+
+    return mat_dat_fmt

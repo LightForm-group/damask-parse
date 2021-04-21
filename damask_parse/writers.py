@@ -13,6 +13,7 @@ from damask_parse.utils import (
     align_orientations,
     get_volume_element_materials,
     validate_volume_element,
+    prepare_material_yaml_data,
 )
 
 __all__ = [
@@ -320,11 +321,12 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
         'homogenization': homog_schemes,
         'microstructure': microstructures,
     }
+    mat_data_fmt = prepare_material_yaml_data(mat_dat)  # e.g. format quats to 15 d.p.
 
     dir_path = Path(dir_path).resolve()
     mat_path = dir_path.joinpath(name)
     yaml = YAML()
-    yaml.dump(mat_dat, mat_path)
+    yaml.dump(mat_data_fmt, mat_path)
 
     return mat_path
 

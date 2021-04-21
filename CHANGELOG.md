@@ -6,6 +6,10 @@
 
 - Allow passing deformation gradient (rate) as a nested list to `writers.write_load_case`.
 
+### Fixed
+
+- Format quaternions in material.yaml to 15 decimal places (in `writers.write_material` via a new function `utils.prepare_material_yaml_data`).
+
 ## [0.2.10] - 2021.01.25
 
 ### Fixed
