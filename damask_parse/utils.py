@@ -664,10 +664,17 @@ def validate_orientations(orientations):
                    f'array of shape (R, 4), but shape passed was: {quaternions.shape}.')
             raise ValueError(msg)
 
+    # To ensure maximum precision of quaternions, cast to longdouble (although note that
+    # precision is system-dependent):
+    quaternions = quaternions.astype(np.longdouble)
+    res = np.finfo(np.longdouble).resolution
     norm_factor = np.sqrt(np.sum(quaternions ** 2, axis=1))
-    if not np.allclose(norm_factor, 1):
-        print('Quaternions are not normalised; they will be normalised.')
-        quaternions = quaternions / norm_factor[:, None]
+    is_normed = np.isclose(norm_factor - 1, 0, atol=res)
+    if not np.all(is_normed):
+        to_norm = np.logical_not(is_normed)
+        print(f'Some ({to_norm.sum()}/{to_norm.size}) quaternions are not normalised to '
+              f'within `np.longdouble` resolution ({res}); they will be normalised.')
+        quaternions[to_norm] = quaternions[to_norm] / norm_factor[to_norm, None]
 
     orientations_valid = {
         'type': 'quat',
@@ -1194,7 +1201,9 @@ def prepare_material_yaml_data(mat_dat):
 
     """
 
-    ORI_NUM_DP = 15
+    # Quaternions are stored as np.longdouble, so write out to maximum available (system-
+    # dependent) precision:
+    ORI_NUM_DP = np.finfo(np.longdouble).precision
 
     mat_dat_fmt = copy.deepcopy(mat_dat)
 
