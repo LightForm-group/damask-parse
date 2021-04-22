@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- Format quaternions in material.yaml to 15 decimal places (in `writers.write_material` via a new function `utils.prepare_material_yaml_data`).
+- In `utils.validate_orientations`, cast quaternions to an array of type `np.longdouble` prior to normalisation, and then write out these quaternions (in `writers.write_material` via a new function `utils.prepare_material_yaml_data`) to the largest precision supported by `np.longdouble` on that machine, to ensure maximum precision, and hopefully avoid the DAMASK error: "invalid orientation specified".
 
 ## [0.2.10] - 2021.01.25
 
