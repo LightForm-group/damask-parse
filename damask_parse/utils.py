@@ -1146,8 +1146,8 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                 mat_i_const_j_ori[1:] *= -1
 
             mat_i_const_j = {
-                'fraction': float(const_mat_frac[const_idx]),
-                'orientation': mat_i_const_j_ori.tolist(),
+                'v': float(const_mat_frac[const_idx]),
+                'O': mat_i_const_j_ori.tolist(),
                 'phase': mat_i_const_j_phase,
             }
             mat_i_constituents.append(mat_i_const_j)
@@ -1184,7 +1184,7 @@ def prepare_material_yaml_data(mat_dat):
         Dict with keys:
             phases
             homogenization
-            microstructure
+            material
 
     Returns
     -------
@@ -1200,10 +1200,10 @@ def prepare_material_yaml_data(mat_dat):
 
     mat_dat_fmt = copy.deepcopy(mat_dat)
 
-    for material in mat_dat_fmt['microstructure']:
+    for material in mat_dat_fmt['material']:
         for const in material['constituents']:
             ori_list = []
-            for ori in const['orientation']:
+            for ori in const['O']:
                 kwargs = {
                     'width': ORI_NUM_DP + 2,
                     'prec': 1,
@@ -1216,6 +1216,6 @@ def prepare_material_yaml_data(mat_dat):
                         'width': kwargs['width'] + 1,
                     })
                 ori_list.append(ruamel.yaml.scalarfloat.ScalarFloat(ori, **kwargs))
-            const['orientation'] = ori_list
+            const['O'] = ori_list
 
     return mat_dat_fmt

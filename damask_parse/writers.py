@@ -312,7 +312,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
 
     """
 
-    microstructures = get_volume_element_materials(
+    materials = get_volume_element_materials(
         volume_element,
         homog_schemes=homog_schemes,
         phases=phases,
@@ -321,7 +321,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     mat_dat = {
         'phase': phases,
         'homogenization': homog_schemes,
-        'microstructure': microstructures,
+        'material': materials,
     }
     mat_data_fmt = prepare_material_yaml_data(mat_dat)  # e.g. format quats to 15 d.p.
 
