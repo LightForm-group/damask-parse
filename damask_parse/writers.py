@@ -75,8 +75,8 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     return geom_path
 
 
-def write_load_case(dir_path, load_cases, name='loads.yaml'):
-    """Write loads file for a DAMASK simulation.
+def write_load_case(dir_path, load_cases, name='load.yaml'):
+    """Write the load file for a DAMASK simulation.
 
     Parameters
     ----------
@@ -85,12 +85,12 @@ def write_load_case(dir_path, load_cases, name='loads.yaml'):
     load_cases : list of dict
 
     name : str, optional
-        Name of loads file to write. By default, set to "loads.yaml".
+        Name of the load file to write. By default, set to "load.yaml".
 
     Returns
     -------
-    loads_path : Path
-        File path to the generated loads file.
+    load_path : Path
+        File path to the generated load file.
 
     """
     load_steps = []
@@ -194,7 +194,7 @@ def write_load_case(dir_path, load_cases, name='loads.yaml'):
 
         load_steps.append(load_step)
 
-    loads_data = {
+    load_data = {
         'solver': {
             'mechanical': 'spectral_basic'
         },
@@ -202,11 +202,11 @@ def write_load_case(dir_path, load_cases, name='loads.yaml'):
     }
 
     dir_path = Path(dir_path).resolve()
-    loads_path = dir_path.joinpath(name)
+    load_path = dir_path.joinpath(name)
     yaml = YAML()
-    yaml.dump(loads_data, loads_path)
+    yaml.dump(load_data, load_path)
 
-    return loads_path
+    return load_path
 
 
 def write_material(homog_schemes, phases, volume_element, dir_path, name='material.yaml'):
