@@ -228,18 +228,11 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
     return True
 
 
-def format_1D_masked_array(arr, fmt='{:.10g}', fill_symbol='*'):
+def format_1D_masked_array(arr, fill_symbol='x'):
     'Also formats non-masked array.'
 
-    arr_fmt = ''
-    for idx, i in enumerate(arr):
-        if idx > 0:
-            arr_fmt += ' '
-        if isinstance(i, np.ma.core.MaskedConstant):
-            arr_fmt += '*'
-        else:
-            arr_fmt += fmt.format(i)
-    return arr_fmt
+    return [x if not isinstance(x, np.ma.core.MaskedConstant)
+            else fill_symbol for x in arr]
 
 
 def parse_damask_spectral_version_info(executable='DAMASK_spectral'):

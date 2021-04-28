@@ -89,15 +89,10 @@ def write_geom(volume_element, geom_path):
     return geom_path
 
 
-def write_load_case(load_path, load_cases):
-    """
+def write_load_case(dir_path, load_cases, name='loads.yaml'):
+    """Write load cases to a yaml file."""
 
-    Example load case line is: 
-        fdot 1.0e-3 0 0  0 * 0  0 0 * stress * * *  * 0 *   * * 0  time 10  incs 40
-
-    """
-
-    all_load_case = []
+    load_steps = []
 
     for load_case in load_cases:
 
@@ -125,12 +120,17 @@ def write_load_case(load_path, load_cases):
             dg_arr_sym = 'F'
         elif def_grad_rate is not None:
             dg_arr = def_grad_rate
-            dg_arr_sym = 'Fdot'
+            dg_arr_sym = 'dot_F'
 
         if isinstance(dg_arr, list):
             dg_arr = np.array(dg_arr)
 
-        load_case_ln = []
+        load_step = {
+            'boundary_conditions': {
+                'mechanical': {}
+            }
+        }
+        bc_mech = load_step['boundary_conditions']['mechanical']
 
         if stress is None:
 
@@ -139,12 +139,11 @@ def write_load_case(load_path, load_cases):
                 raise ValueError(msg)
 
             if isinstance(dg_arr, np.ma.core.MaskedArray):
-                msg = ('To use mixed boundary conditions, `stress` must be passed as a '
-                       'masked array.')
+                msg = ('To use mixed boundary conditions, `stress` must be '
+                       'passed as a masked array.')
                 raise ValueError(msg)
 
-            dg_arr_fmt = format_1D_masked_array(dg_arr.flatten())
-            load_case_ln.append(dg_arr_sym + ' ' + dg_arr_fmt)
+            bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
 
         else:
             if isinstance(stress, np.ma.core.MaskedArray):
@@ -160,14 +159,8 @@ def write_load_case(load_path, load_cases):
                 if np.any(dg_arr.mask == stress.mask):
                     raise ValueError(msg)
 
-                dg_arr_fmt = format_1D_masked_array(
-                    dg_arr.flatten(), fill_symbol='*')
-                stress_arr_fmt = format_1D_masked_array(
-                    stress.flatten(), fill_symbol='*')
-                load_case_ln.extend([
-                    dg_arr_sym + ' ' + dg_arr_fmt,
-                    stress_symbol + ' ' + stress_arr_fmt,
-                ])
+                bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
+                bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
 
             else:
                 if dg_arr is not None:
@@ -175,37 +168,44 @@ def write_load_case(load_path, load_cases):
                            'masked array.')
                     raise ValueError(msg)
 
-                stress_arr_fmt = format_1D_masked_array(stress.flatten())
-                load_case_ln.append(stress_symbol + ' ' + stress_arr_fmt)
+                bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
 
-        load_case_ln.extend([
-            f't {total_time}',
-            f'incs {num_increments}',
-            f'freq {freq}',
-        ])
+        # TODO: add rotation to BCs
+        # if rot is not None:
 
-        if rot is not None:
+        #     rot = np.array(rot)
+        #     msg = 'Matrix passed as a rotation is not a rotation matrix.'
+        #     if not np.allclose(rot.T @ rot, np.eye(3)):
+        #         raise ValueError(msg)
+        #     if not np.isclose(np.linalg.det(rot), 1):
+        #         raise ValueError(msg)
 
-            rot = np.array(rot)
-            msg = 'Matrix passed as a rotation is not a rotation matrix.'
-            if not np.allclose(rot.T @ rot, np.eye(3)):
-                raise ValueError(msg)
-            if not np.isclose(np.linalg.det(rot), 1):
-                raise ValueError(msg)
+        #     rot_fmt = format_1D_masked_array(rot.flatten())
+        #     load_case_ln.append(f'rot {rot_fmt}')
 
-            rot_fmt = format_1D_masked_array(rot.flatten())
-            load_case_ln.append(f'rot {rot_fmt}')
+        #     # bc_mech['R'] = axis-angle of rotation in degrees
 
-        load_case_str = ' '.join(load_case_ln)
-        all_load_case.append(load_case_str)
+        load_step['discretization'] = {
+            't': total_time,
+            'N': num_increments,
+        }
+        load_step['f_out'] = freq
 
-    all_load_case_str = '\n'.join(all_load_case)
+        load_steps.append(load_step)
 
-    load_path = Path(load_path)
-    with load_path.open('w') as handle:
-        handle.write(all_load_case_str)
+    loads_data = {
+        'solver': {
+            'mechanical': 'spectral_basic'
+        },
+        'loadstep': load_steps
+    }
 
-    return load_path
+    dir_path = Path(dir_path).resolve()
+    loads_path = dir_path.joinpath(name)
+    yaml = YAML()
+    yaml.dump(loads_data, loads_path)
+
+    return loads_path
 
 
 def write_material(homog_schemes, phases, volume_element, dir_path, name='material.yaml'):
