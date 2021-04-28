@@ -7,6 +7,8 @@ from collections import OrderedDict
 import numpy as np
 from ruamel.yaml import YAML
 
+from damask import VTK
+
 from damask_parse.utils import (
     zeropad,
     format_1D_masked_array,
@@ -24,74 +26,73 @@ __all__ = [
 ]
 
 
-def write_geom(volume_element, geom_path):
+def write_geom(dir_path, volume_element, name='geom.vtr'):
     """Write the geometry file for a spectral DAMASK simulation.
 
     Parameters
     ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
     volume_element : dict
         Dict that represents the specification of a volume element, with keys:
             element_material_idx : ndarray of shape equal to `grid_size` of int, optional
-                Determines the material to which each geometric model element belongs,
-                where P is the number of elements.
+                Determines the material to which each geometric model
+                element belongs, where P is the number of elements.
             grid_size : ndarray of shape (3,) of int, optional
                 Geometric model grid dimensions.
             size : list of length three, optional
                 Volume element size. By default set to unit size: [1.0, 1.0, 1.0].
             origin : list of length three, optional
                 Volume element origin. By default: [0, 0, 0].
-    geom_path : str or Path
-        The path to the file that will be generated.
+    name : str, optional
+        Name of geometry file to write. By default, set to "geom.vtr".
 
     Returns
     -------
     geom_path : Path
-        The path to the generated file.
+        File path to the generated geometry file.
 
     Notes
     -----
-    The microstructure and texture parts are not included in the header of the generated
-    file.
+    The microstructure and texture parts are not included in the header
+    of the generated file.
 
     """
-
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
 
     grid_size = element_material_idx.shape
     ve_size = volume_element.get('size') or [1.0, 1.0, 1.0]
     ve_origin = volume_element.get('origin') or [0.0, 0.0, 0.0]
-    num_micros = np.max(element_material_idx) + 1  # element_material_idx is zero-indexed
 
-    header_lns = [
-        f'grid a {grid_size[0]} b {grid_size[1]} c {grid_size[2]}',
-        f'size x {ve_size[0]} y {ve_size[1]} z {ve_size[2]}',
-        f'origin x {ve_origin[0]} y {ve_origin[1]} z {ve_origin[2]}',
-        f'microstructures {num_micros}',
-        f'homogenization 1',
-    ]
-    num_header_lns = len(header_lns)
-    header = f'{num_header_lns} header\n' + '\n'.join(header_lns) + '\n'
+    dir_path = Path(dir_path).resolve()
+    geom_path = dir_path.joinpath(name)
 
-    elem_mat_idx_2D = np.concatenate(element_material_idx.swapaxes(0, 2))
-    elem_mat_idx_2D += 1  # one-indexed
-
-    arr_str = ''
-    for row in elem_mat_idx_2D:
-        for col in row:
-            arr_str += '{:<5d}'.format(col)
-        arr_str += '\n'
-
-    geom_path = Path(geom_path)
-    with geom_path.open('w') as handle:
-        handle.write(header + arr_str)
+    geom_vtk = VTK.from_rectilinear_grid(grid_size, ve_size, ve_origin)
+    geom_vtk.add(element_material_idx.flatten(order='F'), 'material')
+    geom_vtk.save(geom_path, parallel=False, compress=True)
 
     return geom_path
 
 
 def write_load_case(dir_path, load_cases, name='loads.yaml'):
-    """Write load cases to a yaml file."""
+    """Write loads file for a DAMASK simulation.
 
+    Parameters
+    ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
+    load_cases : list of dict
+
+    name : str, optional
+        Name of loads file to write. By default, set to "loads.yaml".
+
+    Returns
+    -------
+    loads_path : Path
+        File path to the generated loads file.
+
+    """
     load_steps = []
 
     for load_case in load_cases:
@@ -342,7 +343,7 @@ def write_numerics(dir_path, numerics, name='numerics.yaml'):
     numerics : dict
         Dict of key-value pairs to write into the file.
     name : str, optional
-        Name of numerics file to write. By default, set to "numerics.yaml".        
+        Name of numerics file to write. By default, set to "numerics.yaml".
 
     Returns
     -------
