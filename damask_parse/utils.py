@@ -231,7 +231,7 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
 def format_1D_masked_array(arr, fill_symbol='x'):
     'Also formats non-masked array.'
 
-    return [x if not isinstance(x, np.ma.core.MaskedConstant)
+    return [x.item() if not isinstance(x, np.ma.core.MaskedConstant)
             else fill_symbol for x in arr]
 
 
