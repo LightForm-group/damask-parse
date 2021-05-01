@@ -209,7 +209,6 @@ def read_geom(geom_path):
 
         element_material_idx = np.array(element_material_idx).reshape(grid_size[::-1])
         element_material_idx = element_material_idx.swapaxes(0, 2)
-        element_material_idx -= 1  # zero-indexed
         num_mats = validate_element_material_idx(element_material_idx)
 
         constituent_phase_label_idx = None
