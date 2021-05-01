@@ -414,12 +414,8 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
 
     """
 
-    try:
-        from damask import Result
-        sim_data = Result(hdf5_path)
-    except ImportError:
-        from damask import DADF5
-        sim_data = DADF5(hdf5_path)
+    from damask import Result
+    sim_data = Result(hdf5_path)
 
     for op in operations or []:
         func = getattr(sim_data, op['name'], None)

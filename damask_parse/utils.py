@@ -520,10 +520,8 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
         data = np.array([f[i][dat_path][()] for i in incs])[::increments]
 
-        # flatten structured datatype for orientations
+        # cast to orientation dict
         if dat_path.split('/')[-1] == 'O':
-            data = data.view((data.dtype[data.dtype.names[0]], len(data.dtype)))
-
             # cast to orientation dict
             data = {
                 'type': 'quat',
