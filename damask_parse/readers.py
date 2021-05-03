@@ -413,7 +413,7 @@ def read_HDF5_file(
                 Name of the data field to extract
             increments: list of int
                 Increments to extract from
-        Special field_name keys exist, 'displacemnt', 'grain' and 'phase'. 
+        Special field_name keys exist, 'displacemnt', 'grain' and 'phase'.
     grain_data : list of dict, optional
         List of grain data to extract. This is a list of dict with following keys:
             field_name: str
@@ -461,10 +461,10 @@ def read_HDF5_file(
         # Deal with specific options:
         if op['opts'].get('add_Mises', {}):
 
-            if op["name"] in ['add_Cauchy', 'add_stress_Cauchy']:
+            if op["name"] == 'add_stress_Cauchy':
                 label = f'sigma'
 
-            elif op["name"] in ['add_strain_tensor', 'add_strain']:
+            elif op["name"] == 'add_strain':
                 # Include defaults from `DADF5.add_strain_tensor`:
                 t = op['args'].get('t', 'V')
                 m = op['args'].get('m', 0)
@@ -476,10 +476,7 @@ def read_HDF5_file(
                        f'"add_Mises".')
                 raise ValueError(msg)
 
-            try:
-                sim_data.add_Mises(label)
-            except AttributeError:
-                sim_data.add_equivalent_Mises(label)
+            sim_data.add_equivalent_Mises(label)
 
     incremental_response = {}
     for inc_dat_spec in incremental_data or []:
@@ -520,6 +517,7 @@ def read_HDF5_file(
         # phase mapping
         # grain mapping
         # displacement -- done use u_n
+        # trim off buffers
 
     grain_response = {}
     for grain_dat_spec in grain_data or []:

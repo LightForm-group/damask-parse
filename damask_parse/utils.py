@@ -561,25 +561,21 @@ def get_field_data(sim_data, field_name, increments):
     # if field_name in ['displacement', 'increments', 'phase_mapping']:
     #     raise ValueError(f"{field_name} is a protected name.")
 
-    try:
-        cells = tuple(sim_data.cells)
-    except AttributeError:
-        cells = tuple(sim_data.grid)
-
+    cells = tuple(sim_data.cells)
     if field_name in nodal_fields:
         cells = tuple(i+1 for i in cells)
 
     field_data = []
     incs_valid = []
     for inc in increments:
-        inc_formatted = sim_data.incs_in_range(inc, inc)
+        inc_formatted = sim_data.increments_in_range(inc, inc)
         if len(inc_formatted) != 1:
             print(f"Could not find increment {inc} in output data.")
             continue
         incs_valid.append(inc)
-        sim_data.pick('increments', inc_formatted)
+        sim_data = sim_data.view('increments', inc_formatted)
 
-        ext_data = sim_data.read_dataset(sim_data.get_dataset_location(field_name))
+        ext_data = sim_data.place(output=field_name, constituents=0).data
         # # reshape to make x,y,z contiguous in memory (numpy row major)
         # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
         # ext_data = np.ascontiguousarray(
