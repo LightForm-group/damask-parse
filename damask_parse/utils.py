@@ -4,9 +4,11 @@ from pathlib import Path
 from subprocess import run, PIPE
 import copy
 import re
+import sys
 
 import numpy as np
 import h5py
+import ruamel.yaml
 
 from damask_parse.rotation import rot_mat2euler, euler2rot_mat_n
 from damask_parse.quats import euler2quat, axang2quat, multiply_quaternions
@@ -226,18 +228,11 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
     return True
 
 
-def format_1D_masked_array(arr, fmt='{:.10g}', fill_symbol='*'):
+def format_1D_masked_array(arr, fill_symbol='x'):
     'Also formats non-masked array.'
 
-    arr_fmt = ''
-    for idx, i in enumerate(arr):
-        if idx > 0:
-            arr_fmt += ' '
-        if isinstance(i, np.ma.core.MaskedConstant):
-            arr_fmt += '*'
-        else:
-            arr_fmt += fmt.format(i)
-    return arr_fmt
+    return [x.item() if not isinstance(x, np.ma.core.MaskedConstant)
+            else fill_symbol for x in arr]
 
 
 def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
@@ -540,11 +535,6 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
 
 
 def process_damask_orientatons(ori_data):
-    # flatten structured datatype for orientations
-    ori_data = ori_data.view((
-        ori_data.dtype[ori_data.dtype.names[0]],
-        len(ori_data.dtype)
-    ))
     # cast to orientation dict
     return {
         'type': 'quat',
@@ -639,7 +629,7 @@ def apply_grain_average(field_data, grains, is_oris=False):
         for grain in np.unique(grains):
             grain_data.append(field_data[:, grains == grain].mean(axis=1))
         grain_data = np.array(grain_data).swapaxes(0, 1)
-        
+
     # index order (incs, grains, tensor_comps)
     return grain_data
 
@@ -758,10 +748,17 @@ def validate_orientations(orientations):
                    f'array of shape (R, 4), but shape passed was: {quaternions.shape}.')
             raise ValueError(msg)
 
+    # To ensure maximum precision of quaternions, cast to longdouble (although note that
+    # precision is system-dependent):
+    quaternions = quaternions.astype(np.longdouble)
+    res = np.finfo(np.longdouble).resolution
     norm_factor = np.sqrt(np.sum(quaternions ** 2, axis=1))
-    if not np.allclose(norm_factor, 1):
-        print('Quaternions are not normalised; they will be normalised.')
-        quaternions = quaternions / norm_factor[:, None]
+    is_normed = np.isclose(norm_factor - 1, 0, atol=res)
+    if not np.all(is_normed):
+        to_norm = np.logical_not(is_normed)
+        print(f'Some ({to_norm.sum()}/{to_norm.size}) quaternions are not normalised to '
+              f'within `np.longdouble` resolution ({res}); they will be normalised.')
+        quaternions[to_norm] = quaternions[to_norm] / norm_factor[to_norm, None]
 
     orientations_valid = {
         'type': 'quat',
@@ -1240,8 +1237,8 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                 mat_i_const_j_ori[1:] *= -1
 
             mat_i_const_j = {
-                'fraction': float(const_mat_frac[const_idx]),
-                'orientation': mat_i_const_j_ori.tolist(),
+                'v': float(const_mat_frac[const_idx]),
+                'O': mat_i_const_j_ori.tolist(),
                 'phase': mat_i_const_j_phase,
             }
             mat_i_constituents.append(mat_i_const_j)
@@ -1266,3 +1263,50 @@ def validate_element_material_idx(element_material_idx):
         raise ValueError(msg)
 
     return num_mats
+
+
+def prepare_material_yaml_data(mat_dat):
+    """Prepare data for writing to the DAMASK material.yaml file, by choosing desired
+    formatting where necessary, including formatting quaternions to a given precision.
+
+    Parameters
+    ----------
+    mat_dat : dict 
+        Dict with keys:
+            phases
+            homogenization
+            material
+
+    Returns
+    -------
+    mat_dat_fmt : dict
+        Copy of input dict, `mat_dat`, where some data has been replaced by objects
+        from ruamel.yaml to provide desired formatting.
+
+    """
+
+    # Quaternions are stored as np.longdouble, so write out to maximum available (system-
+    # dependent) precision:
+    ORI_NUM_DP = np.finfo(np.longdouble).precision
+
+    mat_dat_fmt = copy.deepcopy(mat_dat)
+
+    for material in mat_dat_fmt['material']:
+        for const in material['constituents']:
+            ori_list = []
+            for ori in const['O']:
+                kwargs = {
+                    'width': ORI_NUM_DP + 2,
+                    'prec': 1,
+                    'm_sign': False,
+                }
+                if ori < 0:
+                    kwargs.update({
+                        'prec': 2,
+                        'm_sign': '-',
+                        'width': kwargs['width'] + 1,
+                    })
+                ori_list.append(ruamel.yaml.scalarfloat.ScalarFloat(ori, **kwargs))
+            const['O'] = ori_list
+
+    return mat_dat_fmt

@@ -211,7 +211,6 @@ def read_geom(geom_path):
 
         element_material_idx = np.array(element_material_idx).reshape(grid_size[::-1])
         element_material_idx = element_material_idx.swapaxes(0, 2)
-        element_material_idx -= 1  # zero-indexed
         num_mats = validate_element_material_idx(element_material_idx)
 
         constituent_phase_label_idx = None
@@ -439,28 +438,18 @@ def read_HDF5_file(
 
     """
     if not geom_path:
-        geom_path = Path(hdf5_path).parent / 'geom.geom'
+        geom_path = Path(hdf5_path).parent / 'geom.vtr'
 
     # Open DAMASK output file if required
     if operations or field_data or grain_data:
-        try:
-            from damask import Result
-            sim_data = Result(str(hdf5_path))
-        except ImportError:
-            from damask import DADF5
-            sim_data = DADF5(str(hdf5_path))
+        from damask import Result
+        sim_data = Result(hdf5_path)
+
     # Load in grain mapping if required
     if grain_data:
-        try:
-            from damask import Grid
-            ve = Grid.load_ASCII(str(geom_path))
-            # 0-indexed, make 1-indexed
-            grains = ve.material + 1
-        except ImportError:
-            from damask import Geom
-            ve = Geom.from_file(str(geom_path))
-            # should be 1-indexed, check
-            grains = ve.microstructure
+        from damask import Grid
+        ve = Grid.load(geom_path)
+        grains = ve.material
 
     for op in operations or []:
         func = getattr(sim_data, op['name'], None)
@@ -510,11 +499,11 @@ def read_HDF5_file(
                 },
             }
         })
-    
+
     field_response = {}
     for field_dat_spec in field_data or []:
         field_dat, increments = get_field_data(
-            sim_data, 
+            sim_data,
             field_dat_spec['field_name'],
             field_dat_spec['increments']
         )
@@ -542,7 +531,7 @@ def read_HDF5_file(
         # otherwise create it
         else:
             field_dat, increments = get_field_data(
-                sim_data, 
+                sim_data,
                 grain_dat_spec['field_name'],
                 grain_dat_spec['increments']
             )
