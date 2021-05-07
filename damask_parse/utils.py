@@ -1207,7 +1207,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
             mat_i_const_j_phase = str(const_phase_lab[const_idx])
             mat_i_const_j_ori = all_quats[const_ori_idx[const_idx]]
 
-            if phases[mat_i_const_j_phase]['lattice'] == 'hex':
+            if phases[mat_i_const_j_phase]['lattice'] == 'hP':
 
                 if 'unit_cell_alignment' not in volume_element['orientations']:
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
