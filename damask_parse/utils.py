@@ -513,23 +513,27 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         be extracted.
 
     """
-
     with h5py.File(str(hdf5_path), 'r') as f:
-
         incs = [i for i in f.keys() if 'inc' in i]
         incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
-        data = np.array([f[i][dat_path][()] for i in incs])[::increments]
+        incs = incs[::increments]
+
+        all_data = []
+        for inc in incs:
+            data = f[inc][dat_path][()]
+
+            for transform in transforms or []:
+                if 'mean_along_axes' in transform:
+                    data = np.mean(data, transform['mean_along_axes']-1)
+                if 'sum_along_axes' in transform:
+                    data = np.sum(data, transform['sum_along_axes']-1)
+
+            all_data.append(data)
+
+        data = np.array(all_data)
 
         if dat_path.split('/')[-1] == 'O':
             data = process_damask_orientatons(data)
-
-        # transform options don't really apply to orientations
-        elif transforms:
-            for i in transforms:
-                if 'mean_along_axes' in i:
-                    data = np.mean(data, i['mean_along_axes'])
-                if 'sum_along_axes' in i:
-                    data = np.sum(data, i['sum_along_axes'])
 
         return data
 
