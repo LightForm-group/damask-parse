@@ -563,6 +563,33 @@ def process_damask_orientatons(ori_data):
     }
 
 
+def reshape_field_data(field_data, new_shape):
+    """Reshape data array to VE dimensions
+
+    Parameters
+    ----------
+    field_data : np.ndarray
+        Data array to reshape, shape (N, ...).
+    new_shape : tuple
+        Shape of output, must be compatible with N.
+    """
+
+    # # reshape to make x,y,z contiguous in memory (numpy row major)
+    # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
+    # old_shape = field_data.shape
+    # if len(old_shape) > 1 and old_shape[1:] != (1,):
+    #     new_shape = old_shape[1:] + new_shape
+    # return np.ascontiguousarray(field_data.T.reshape(new_shape, order='F'))
+    # or reshape to make tensor components contiguous in memory (numpy row major)
+    # dimensions: 0: x-pos, 1: y-pos, 2: z-pos 3,4: tensor components
+    old_shape = field_data.shape
+    if len(old_shape) > 1 and old_shape[1:] != (1,):
+        new_shape += old_shape[1:]
+    return np.ascontiguousarray(field_data.reshape(new_shape, order='F'))
+    # this seems more inline with what is already done with `incremental_data`
+    # dims (incs, spatial, tensor comps)
+
+
 def get_field_data(sim_data, field_name, increments):
     """Access data from DAMASK result object and place on the simulation grid.
 
@@ -577,8 +604,6 @@ def get_field_data(sim_data, field_name, increments):
 
     """
     nodal_fields = ['u_n']
-    # if field_name in ['displacement', 'increments', 'phase_mapping']:
-    #     raise ValueError(f"{field_name} is a protected name.")
 
     cells = tuple(sim_data.cells)
     if field_name in nodal_fields:
@@ -600,23 +625,7 @@ def get_field_data(sim_data, field_name, increments):
             continue
 
         incs_valid.append(inc)
-        ext_data = ext_data.data
-        # # reshape to make x,y,z contiguous in memory (numpy row major)
-        # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
-        # ext_data = np.ascontiguousarray(
-        #     ext_data.T.reshape(ext_data.shape[1:] + tuple(cells), order='F')
-        # )
-        # or reshape to make tensor components contiguous in memory (numpy row major)
-        # dimensions: 0: x-pos, 1: y-pos, 2: z-pos 3,4: tensor components
-        old_shape = ext_data.shape
-        new_shape = cells
-        if len(old_shape) > 1 and old_shape[1:] != (1,):
-            new_shape += old_shape[1:]
-        ext_data = np.ascontiguousarray(ext_data.reshape(new_shape, order='F'))
-        # this seems more inline with what is already done with `incremental_data`
-        # dims (incs, spatial, tensor comps)
-
-        field_data.append(ext_data)
+        field_data.append(reshape_field_data(ext_data.data, cells))
 
     # convert list of array
     # index order (incs, spatial_comps, tensor_comps)

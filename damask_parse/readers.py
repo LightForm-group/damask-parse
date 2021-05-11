@@ -14,6 +14,7 @@ from damask_parse.utils import (
     validate_volume_element,
     validate_element_material_idx,
     get_field_data,
+    reshape_field_data,
     apply_grain_average,
 )
 from damask_parse.legacy.readers import parse_microstructure, parse_texture_gauss
@@ -446,7 +447,7 @@ def read_HDF5_file(
         sim_data = Result(hdf5_path)
 
     # Load in grain mapping if required
-    if grain_data:
+    if grain_data or ('grain' in (spec['field_name'] for spec in field_data)):
         from damask import Grid
         ve = Grid.load(geom_path)
         grains = ve.material
@@ -479,55 +480,70 @@ def read_HDF5_file(
             sim_data.add_equivalent_Mises(label)
 
     incremental_response = {}
-    for inc_dat_spec in incremental_data or []:
+    for spec in incremental_data or []:
         inc_dat = get_HDF5_incremental_quantity(
             hdf5_path=hdf5_path,
-            dat_path=inc_dat_spec['path'],
-            transforms=inc_dat_spec.get('transforms'),
-            increments=inc_dat_spec.get('increments', 1),
+            dat_path=spec['path'],
+            transforms=spec.get('transforms'),
+            increments=spec.get('increments', 1),
         )
         incremental_response.update({
-            inc_dat_spec['name']: {
+            spec['name']: {
                 'data': inc_dat,
                 'meta': {
-                    'path': inc_dat_spec['path'],
-                    'transforms': inc_dat_spec.get('transforms'),
-                    'increments': inc_dat_spec.get('increments', 1),
+                    'path': spec['path'],
+                    'transforms': spec.get('transforms'),
+                    'increments': spec.get('increments', 1),
                 },
             }
         })
 
     field_response = {}
-    for field_dat_spec in field_data or []:
-        field_dat, increments = get_field_data(
-            sim_data,
-            field_dat_spec['field_name'],
-            field_dat_spec['increments']
-        )
-        # No incements returned, contiue to next
-        if not increments:
-            continue
+    for spec in field_data or []:
+        field_name = spec['field_name']
+        if field_name == 'phase':
+            at_cell_ph, _, _, _ = sim_data._mappings()
+            phase_mapping = np.empty(sim_data.N_materialpoints, dtype=np.uint8)
+            phase_names = []
+
+            for i, (phase_name, mask) in enumerate(at_cell_ph[0].items()):
+                phase_mapping[mask] = i
+                phase_names.append(phase_name)
+
+            field_dat = reshape_field_data(phase_mapping,
+                                           tuple(sim_data.cells))
+            field_meta = {
+                'phase_names': phase_names,
+                'num_phases': len(np.unique(phase_mapping)),
+            }
+
+        elif field_name == 'grain':
+            field_dat = grains
+            field_meta = {'num_grains': len(np.unique(grains))}
+
+        else:
+            field_dat, increments = get_field_data(
+                sim_data, field_name, spec['increments']
+            )
+            field_meta = {'increments': increments}
+            # No incements returned, contiue to next
+            if not increments:
+                continue
+
         field_response.update({
-            field_dat_spec['field_name']: {
+            field_name: {
                 'data': field_dat,
-                'meta': {
-                    'increments': increments,
-                }
+                'meta': field_meta
             }
         })
 
-        # TODO
-        # phase mapping
-        # grain mapping
-        # displacement -- done use u_n
-        # trim off buffers
-
     grain_response = {}
-    for grain_dat_spec in grain_data or []:
+    for spec in grain_data or []:
+        field_name = spec['field_name']
         # check if identical field data already exists
-        if grain_dat_spec in (field_data or []):
+        if spec in (field_data or []):
             try:
-                field_dat = field_response[grain_dat_spec['field_name']]
+                field_dat = field_response[field_name]
             except KeyError:
                 # No incements returned in field response, contiue to next
                 continue
@@ -536,20 +552,18 @@ def read_HDF5_file(
         # otherwise create it
         else:
             field_dat, increments = get_field_data(
-                sim_data,
-                grain_dat_spec['field_name'],
-                grain_dat_spec['increments']
+                sim_data, field_name, spec['increments']
             )
             # No incements returned, contiue to next
             if not increments:
                 continue
 
         # grain average
-        is_oris = grain_dat_spec['field_name'] == 'O'
+        is_oris = field_name == 'O'
         grain_dat = apply_grain_average(field_dat, grains, is_oris=is_oris)
 
         grain_response.update({
-            grain_dat_spec['field_name']: {
+            field_name: {
                 'data': grain_dat,
                 'meta': {
                     'increments': increments,
@@ -680,7 +694,7 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
             quaternions : (list or ndarray of shape (R, 4)) of float, optional
                 Array of R row four-vectors of unit quaternions. Specify either
                 `quaternions` or `euler_angles`.
-            euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
+            euler_angles : (list or ndarray of shape (R, 3)) of float, optional
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention (rotations are about Z, new-X, new-new-Z).
