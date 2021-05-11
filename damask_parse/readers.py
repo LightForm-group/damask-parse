@@ -504,6 +504,9 @@ def read_HDF5_file(
             field_dat_spec['field_name'],
             field_dat_spec['increments']
         )
+        # No incements returned, contiue to next
+        if not increments:
+            continue
         field_response.update({
             field_dat_spec['field_name']: {
                 'data': field_dat,
@@ -523,7 +526,11 @@ def read_HDF5_file(
     for grain_dat_spec in grain_data or []:
         # check if identical field data already exists
         if grain_dat_spec in (field_data or []):
-            field_dat = field_response[grain_dat_spec['field_name']]
+            try:
+                field_dat = field_response[grain_dat_spec['field_name']]
+            except KeyError:
+                # No incements returned in field response, contiue to next
+                continue
             increments = field_dat['meta']['increments']
             field_dat = field_dat['data']
         # otherwise create it
@@ -533,6 +540,9 @@ def read_HDF5_file(
                 grain_dat_spec['field_name'],
                 grain_dat_spec['increments']
             )
+            # No incements returned, contiue to next
+            if not increments:
+                continue
 
         # grain average
         is_oris = grain_dat_spec['field_name'] == 'O'

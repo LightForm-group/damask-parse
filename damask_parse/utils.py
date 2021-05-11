@@ -523,14 +523,29 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
             data = f[inc][dat_path][()]
 
             for transform in transforms or []:
-                if 'mean_along_axes' in transform:
-                    data = np.mean(data, transform['mean_along_axes']-1)
-                if 'sum_along_axes' in transform:
-                    data = np.sum(data, transform['sum_along_axes']-1)
+                for op, axis in transform.items():
+                    if axis < 1:
+                        continue
+
+                    if op == 'mean_along_axes':
+                        data = np.mean(data, axis-1)
+                    elif op == 'sum_along_axes':
+                        data = np.sum(data, axis-1)
 
             all_data.append(data)
 
         data = np.array(all_data)
+
+        # Apply any transforms on the increment axis
+        for transform in transforms or []:
+            for op, axis in transform.items():
+                if axis > 0:
+                    continue
+
+                if op == 'mean_along_axes':
+                    data = np.mean(data, axis)
+                elif op == 'sum_along_axes':
+                    data = np.sum(data, axis)
 
         if dat_path.split('/')[-1] == 'O':
             data = process_damask_orientatons(data)
@@ -576,10 +591,16 @@ def get_field_data(sim_data, field_name, increments):
         if len(inc_formatted) != 1:
             print(f"Could not find increment {inc} in output data.")
             continue
-        incs_valid.append(inc)
         sim_data = sim_data.view('increments', inc_formatted)
 
-        ext_data = sim_data.place(output=field_name, constituents=0).data
+        ext_data = sim_data.place(output=field_name, constituents=0)
+        if ext_data is None:
+            print(f"Could not find field '{field_name}' for increment {inc} "
+                  f"in output data.")
+            continue
+
+        incs_valid.append(inc)
+        ext_data = ext_data.data
         # # reshape to make x,y,z contiguous in memory (numpy row major)
         # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
         # ext_data = np.ascontiguousarray(
