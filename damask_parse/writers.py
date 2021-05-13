@@ -14,6 +14,7 @@ from damask_parse.utils import (
     get_volume_element_materials,
     validate_volume_element,
     prepare_material_yaml_data,
+    masked_array_from_list,
 )
 
 __all__ = [
@@ -128,7 +129,14 @@ def write_load_case(load_path, load_cases):
             dg_arr_sym = 'Fdot'
 
         if isinstance(dg_arr, list):
-            dg_arr = np.array(dg_arr)
+            if isinstance(dg_arr[0], list):
+                dg_arr = [j for i in dg_arr for j in i]  # flatten
+            dg_arr = masked_array_from_list(dg_arr, fill_value='*').reshape((3, 3))
+
+        if isinstance(stress, list):
+            if isinstance(stress[0], list):
+                stress = [j for i in stress for j in i]  # flatten
+            stress = masked_array_from_list(stress, fill_value='*').reshape((3, 3))
 
         load_case_ln = []
 

@@ -242,6 +242,24 @@ def format_1D_masked_array(arr, fmt='{:.10g}', fill_symbol='*'):
     return arr_fmt
 
 
+def masked_array_from_list(arr, fill_value='*'):
+    """Generate a (masked) array from a 1D list whose elements may contain a fill value."""
+
+    data = np.empty(len(arr))
+    mask = np.zeros(len(arr))
+    has_mask = False
+    for idx, i in enumerate(arr):
+        if i == fill_value:
+            mask[idx] = True
+            has_mask = True
+        else:
+            data[idx] = i
+    if has_mask:
+        return np.ma.masked_array(data, mask=mask)
+    else:
+        return data
+
+
 def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     'Parse the DAMASK version number and compiler options from `DAMASK_spectral --help`.'
 
