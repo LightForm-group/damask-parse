@@ -676,6 +676,11 @@ def validate_orientations(orientations):
               f'within `np.longdouble` resolution ({res}); they will be normalised.')
         quaternions[to_norm] = quaternions[to_norm] / norm_factor[to_norm, None]
 
+    if not orientations.get('use_max_precision'):
+        # Cast back to float64 (supported on all systems), unless requested to keep
+        # highest precision:
+        quaternions = quaternions.astype(np.float64)
+
     orientations_valid = {
         'type': 'quat',
         'quaternions': quaternions,
