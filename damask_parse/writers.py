@@ -104,7 +104,7 @@ def write_load_case(load_path, load_cases):
         def_grad_aim = load_case.get('def_grad_aim')
         def_grad_rate = load_case.get('def_grad_rate')
         stress = load_case.get('stress')
-        rot = load_case.get('rotation')
+        rot = load_case.get('rotation_matrix')
         total_time = load_case['total_time']
         num_increments = load_case['num_increments']
         freq = load_case.get('dump_frequency', 1)
