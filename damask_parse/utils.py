@@ -521,36 +521,73 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         all_data = []
         for inc in incs:
             data = f[inc][dat_path][()]
-
-            for transform in transforms or []:
-                for op, axis in transform.items():
-                    if axis < 1:
-                        continue
-
-                    if op == 'mean_along_axes':
-                        data = np.mean(data, axis-1)
-                    elif op == 'sum_along_axes':
-                        data = np.sum(data, axis-1)
-
+            data = apply_transforms(data, transforms, True)
             all_data.append(data)
 
-        data = np.array(all_data)
-
+        all_data = np.array(all_data)
         # Apply any transforms on the increment axis
-        for transform in transforms or []:
-            for op, axis in transform.items():
-                if axis > 0:
-                    continue
-
-                if op == 'mean_along_axes':
-                    data = np.mean(data, axis)
-                elif op == 'sum_along_axes':
-                    data = np.sum(data, axis)
+        all_data = apply_transforms(all_data, transforms, False)
 
         if dat_path.split('/')[-1] == 'O':
-            data = process_damask_orientatons(data)
+            all_data = process_damask_orientatons(all_data)
 
-        return data
+        return all_data
+
+
+def parse_inc_specs(inc_specs, sim_data):
+    # nothing specified, default to all
+    if not inc_specs:
+        return sim_data.increments
+
+    inc_prefix = 'increment_'
+    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+    incs = set()
+    for inc_spec in inc_specs:
+        if any(k in inc_spec for k in ('start', 'stop', 'step')):
+            if 'values' in inc_spec:
+                print("Only 'values' or a range ('start', 'stop', 'step') "
+                      "should be given in an increment specification, not "
+                      "both. Interpreting as a range.")
+
+            start = inc_spec.get('start', 0)
+            stop = inc_spec.get('stop', incs_in_file[-1])
+            step = inc_spec.get('step', 1)
+            new_incs = range(start, stop + 1, step)
+
+        elif 'values' in inc_spec:
+            new_incs = inc_spec['values']
+
+        else:
+            print("Unknown increment specification.")
+            continue
+
+        incs = incs.union(set(new_incs))
+
+    incs_in_file = incs.intersection(set(incs_in_file))
+    incs_missing = incs.difference(incs_in_file)
+    if incs_missing:
+        print("These requested increments were not found: ",
+              sorted(list(incs_missing)))
+
+    return sorted(list(incs_in_file))
+
+
+def apply_transforms(data, transforms, single_inc):
+    for transform in transforms or []:
+        for op, axis in transform.items():
+            if axis == 0 and not single_inc:
+                shift = 0
+            elif axis > 0 and single_inc:
+                shift = -1
+            else:
+                continue
+
+            if op == 'mean_along_axes':
+                data = np.mean(data, axis + shift)
+            elif op == 'sum_along_axes':
+                data = np.sum(data, axis + shift)
+
+    return data
 
 
 def process_damask_orientatons(ori_data):
@@ -604,6 +641,7 @@ def get_field_data(sim_data, field_name, increments):
 
     """
     nodal_fields = ['u_n']
+    inc_prefix = 'increment_'
 
     cells = tuple(sim_data.cells)
     if field_name in nodal_fields:
@@ -612,20 +650,19 @@ def get_field_data(sim_data, field_name, increments):
     field_data = []
     incs_valid = []
     for inc in increments:
-        inc_formatted = sim_data.increments_in_range(inc, inc)
-        if len(inc_formatted) != 1:
-            print(f"Could not find increment {inc} in output data.")
-            continue
-        sim_data = sim_data.view('increments', inc_formatted)
+        sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
 
-        ext_data = sim_data.place(output=field_name, constituents=0)
-        if ext_data is None:
+        data = sim_data.place(output=field_name, constituents=0)
+        if data is None:
             print(f"Could not find field '{field_name}' for increment {inc} "
                   f"in output data.")
             continue
 
+        data = data.data
+        data = reshape_field_data(data, cells)
+
         incs_valid.append(inc)
-        field_data.append(reshape_field_data(ext_data.data, cells))
+        field_data.append(data)
 
     # convert list of array
     # index order (incs, spatial_comps, tensor_comps)
