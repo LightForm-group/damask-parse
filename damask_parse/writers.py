@@ -8,6 +8,7 @@ import numpy as np
 from ruamel.yaml import YAML
 
 from damask import VTK
+from damask import Rotation
 
 from damask_parse.utils import (
     zeropad,
@@ -171,20 +172,18 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
 
                 bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
 
-        # TODO: add rotation to BCs
-        # if rot is not None:
+        if rot is not None:
+            rot = np.array(rot)
+            msg = 'Matrix passed as a rotation is not a rotation matrix.'
+            if not np.allclose(rot.T @ rot, np.eye(3)):
+                raise ValueError(msg)
+            if not np.isclose(np.linalg.det(rot), 1):
+                raise ValueError(msg)
 
-        #     rot = np.array(rot)
-        #     msg = 'Matrix passed as a rotation is not a rotation matrix.'
-        #     if not np.allclose(rot.T @ rot, np.eye(3)):
-        #         raise ValueError(msg)
-        #     if not np.isclose(np.linalg.det(rot), 1):
-        #         raise ValueError(msg)
+            rot = Rotation._om2ax(rot)
+            rot[3] *= 180 / np.pi
 
-        #     rot_fmt = format_1D_masked_array(rot.flatten())
-        #     load_case_ln.append(f'rot {rot_fmt}')
-
-        #     # bc_mech['R'] = axis-angle of rotation in degrees
+            bc_mech['R'] = rot.tolist()
 
         load_step['discretization'] = {
             't': total_time,
