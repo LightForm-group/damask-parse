@@ -14,11 +14,10 @@ from damask_parse.utils import (
     validate_volume_element,
     validate_element_material_idx,
     get_field_data,
+    get_vol_data,
+    get_phase_data,
     reshape_field_data,
     apply_grain_average,
-    parse_inc_specs,
-    apply_transforms,
-    process_damask_orientatons,
 )
 from damask_parse.legacy.readers import parse_microstructure, parse_texture_gauss
 
@@ -420,8 +419,8 @@ def read_HDF5_file(
                 Name of the data field to extract
             increments: list of dict, optional
                 List of increment specifications to extract data from. Values
-                refer to increments in the simulation. Default to all.This is a
-                list of dict one of the following sets of keys:
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
                     values: list of int
                         List of incremnts to extract
                     ----OR----
@@ -448,8 +447,8 @@ def read_HDF5_file(
                 Name of phase to
             increments: list of dict, optional
                 List of increment specifications to extract data from. Values
-                refer to increments in the simulation. Default to all.This is a
-                list of dict one of the following sets of keys:
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
                     values: list of int
                         List of incremnts to extract
                     ----OR----
@@ -474,8 +473,8 @@ def read_HDF5_file(
                 Name of the data field to extract
             increments: list of dict, optional
                 List of increment specifications to extract data from. Values
-                refer to increments in the simulation. Default to all.This is a
-                list of dict one of the following sets of keys:
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
                     values: list of int
                         List of incremnts to extract
                     ----OR----
@@ -494,8 +493,8 @@ def read_HDF5_file(
                 Name of the data field to extract
             increments: list of dict, optional
                 List of increment specifications to extract data from. Values
-                refer to increments in the simulation. Default to all.This is a
-                list of dict one of the following sets of keys:
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
                     values: list of int
                         List of incremnts to extract
                     ----OR----
@@ -522,8 +521,6 @@ def read_HDF5_file(
         Dict with keys determined by the `incremental_data` list and `field_data` dict.
 
     """
-    inc_prefix = 'increment_'
-
     if not geom_path:
         geom_path = Path(hdf5_path).parent / 'geom.vtr'
 
@@ -587,60 +584,31 @@ def read_HDF5_file(
 
     volume_response = {}
     for spec in volume_data or []:
-        from damask.util import dict_flatten
-        # spec: field_name, increments, out_name, transforms
         field_name = spec['field_name']
-        increments = parse_inc_specs(spec.get('increments'), sim_data)
+        out_name = spec.get('out_name')
         transforms = spec.get('transforms')
 
-        vol_dat = []
-        incs_valid = []
-        for inc in increments:
-            sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
-
-            data = sim_data.get(output=field_name, flatten=False)
-
-            if data is None:
-                print(f"Could not find field '{field_name}' for increment "
-                      f"{inc} in output data.")
-                continue
-
-            data = next(iter(data.values()))  # get only inc
-            try:
-                phase_names = list(data['phase'].keys())
-            except KeyError:
-                phase_names = []
-            data = dict_flatten(data)
-            if isinstance(data, dict):
-                data = np.vstack([dat for dat in data.values()])
-            elif not isinstance(data, np.ndarray):
-                continue   # something isn't right, move to next
-
-            data = apply_transforms(data, transforms, True)
-
-            incs_valid.append(inc)
-            vol_dat.append(data)
-
-        if not incs_valid:
+        vol_dat, increments, phase_names = get_vol_data(
+            sim_data, field_name, spec.get('increments'), transforms=transforms
+        )
+        # No incements returned, contiue to next
+        if not increments:
             continue
-        vol_dat = np.array(vol_dat)
-        vol_dat = apply_transforms(vol_dat, transforms, False)
 
-        if field_name == 'O':
-            vol_dat = process_damask_orientatons(vol_dat)
-
-        # Construct default out_name
-        out_name = [f'{op}_{axis}' for t in transforms or []
-                    for op, axis in t.items()]
-        out_name = '_'.join([field_name] + out_name)
+        # Get out_name or construct out_name
+        if out_name is None:
+            out_name = [field_name]
+            out_name += [f'{op}_{axis}' for t in transforms or []
+                         for op, axis in t.items()]
+            out_name = '_'.join(out_name)
 
         volume_response.update({
-            spec.get('out_name', out_name): {
+            out_name: {
                 'data': vol_dat,
                 'meta': {
                     'field_name': field_name,
                     'phase_names': phase_names,
-                    'increments': incs_valid,
+                    'increments': increments,
                     'transforms': transforms,
                 }
             }
@@ -648,48 +616,33 @@ def read_HDF5_file(
 
     phase_response = {}
     for spec in phase_data or []:
-        # spec: field_name, phase_name, increments, out_name, transforms
         field_name = spec['field_name']
         phase_name = spec['phase_name']
-        increments = parse_inc_specs(spec.get('increments'), sim_data)
+        out_name = spec.get('out_name')
         transforms = spec.get('transforms')
 
-        phase_dat = []
-        incs_valid = []
-        for inc in increments:
-            sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
-
-            data = sim_data.view('phases', phase_name).get(output=field_name)
-            if data is None:
-                print(f"Could not find field '{field_name}' for phase "
-                      f"'{phase_name}' and increment {inc} in output data.")
-                continue
-
-            data = apply_transforms(data, transforms, True)
-
-            incs_valid.append(inc)
-            phase_dat.append(data)
-
-        if not incs_valid:
+        phase_dat, increments = get_phase_data(
+            sim_data, field_name, phase_name, spec.get('increments'),
+            transforms=transforms
+        )
+        # No incements returned, contiue to next
+        if not increments:
             continue
-        phase_dat = np.array(phase_dat)
-        phase_dat = apply_transforms(phase_dat, transforms, False)
 
-        if field_name == 'O':
-            phase_dat = process_damask_orientatons(phase_dat)
-
-        # Construct default out_name
-        out_name = [f'{op}_{axis}' for t in transforms or []
-                    for op, axis in t.items()]
-        out_name = '_'.join([field_name, phase_name] + out_name)
+        # Get out_name or construct out_name
+        if out_name is None:
+            out_name = [field_name, phase_name]
+            out_name += [f'{op}_{axis}' for t in transforms or []
+                         for op, axis in t.items()]
+            out_name = '_'.join(out_name)
 
         phase_response.update({
-            spec.get('out_name', out_name): {
+            out_name: {
                 'data': phase_dat,
                 'meta': {
                     'field_name': field_name,
                     'phase_name': phase_name,
-                    'increments': incs_valid,
+                    'increments': increments,
                     'transforms': transforms,
                 }
             }
@@ -697,8 +650,8 @@ def read_HDF5_file(
 
     field_response = {}
     for spec in field_data or []:
-        # spec: field_name, increments
         field_name = spec['field_name']
+
         if field_name == 'phase':
             at_cell_ph, _, _, _ = sim_data._mappings()
             phase_mapping = np.empty(sim_data.N_materialpoints, dtype=np.uint8)
@@ -720,9 +673,8 @@ def read_HDF5_file(
             field_meta = {'num_grains': len(np.unique(grains))}
 
         else:
-            increments = parse_inc_specs(spec.get('increments'), sim_data)
             field_dat, increments = get_field_data(
-                sim_data, field_name, increments
+                sim_data, field_name, spec.get('increments')
             )
             # No incements returned, contiue to next
             if not increments:
@@ -738,8 +690,8 @@ def read_HDF5_file(
 
     grain_response = {}
     for spec in grain_data or []:
-        # spec: field_name, increments
         field_name = spec['field_name']
+
         # check if identical field data already exists
         if spec in (field_data or []):
             try:
@@ -751,9 +703,8 @@ def read_HDF5_file(
             field_dat = field_dat['data']
         # otherwise create it
         else:
-            increments = parse_inc_specs(spec.get('increments'), sim_data)
             field_dat, increments = get_field_data(
-                sim_data, field_name, increments
+                sim_data, field_name, spec.get('increments')
             )
             # No incements returned, contiue to next
             if not increments:

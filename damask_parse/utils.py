@@ -573,6 +573,9 @@ def parse_inc_specs(inc_specs, sim_data):
 
 
 def apply_transforms(data, transforms, single_inc):
+    if data.size == 0:
+        return data
+
     for transform in transforms or []:
         for op, axis in transform.items():
             if axis == 0 and not single_inc:
@@ -581,6 +584,9 @@ def apply_transforms(data, transforms, single_inc):
                 shift = -1
             else:
                 continue
+
+            if axis + shift >= data.ndim:
+                print(f"Could not apply '{op}' on axis {axis}.")
 
             if op == 'mean_along_axes':
                 data = np.mean(data, axis + shift)
@@ -600,6 +606,15 @@ def process_damask_orientatons(ori_data):
     }
 
 
+def increment_generator(increments, sim_data):
+    inc_prefix = 'increment_'
+
+    for inc in parse_inc_specs(increments, sim_data):
+        sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
+
+        yield inc, sim_data
+
+
 def reshape_field_data(field_data, new_shape):
     """Reshape data array to VE dimensions
 
@@ -609,8 +624,8 @@ def reshape_field_data(field_data, new_shape):
         Data array to reshape, shape (N, ...).
     new_shape : tuple
         Shape of output, must be compatible with N.
-    """
 
+    """
     # # reshape to make x,y,z contiguous in memory (numpy row major)
     # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
     # old_shape = field_data.shape
@@ -627,6 +642,76 @@ def reshape_field_data(field_data, new_shape):
     # dims (incs, spatial, tensor comps)
 
 
+def get_vol_data(sim_data, field_name, increments, transforms=None):
+    from damask.util import dict_flatten
+
+    vol_data = []
+    incs_valid = []
+    first_inc = True
+    phase_names = []
+    for inc, sim_data in increment_generator(increments, sim_data):
+        data = sim_data.get(output=field_name, flatten=(not first_inc))
+
+        if data is None:
+            print(f"Could not find field '{field_name}' for increment "
+                  f"{inc} in output data.")
+            continue
+
+        # get names of phases in the output
+        if first_inc:
+            data = next(iter(data.values()))  # get only inc
+            try:
+                phase_names = list(data['phase'].keys())
+            except KeyError:
+                pass
+            data = dict_flatten(data)
+            first_inc = False
+
+        if isinstance(data, dict):
+            data = np.vstack([dat for dat in data.values()])
+        elif not isinstance(data, np.ndarray):
+            continue   # something isn't right, move to next
+
+        data = apply_transforms(data, transforms, True)
+
+        incs_valid.append(inc)
+        vol_data.append(data)
+
+    vol_data = np.array(vol_data)
+    vol_data = apply_transforms(vol_data, transforms, False)
+
+    if field_name == 'O':
+        vol_data = process_damask_orientatons(vol_data)
+
+    return vol_data, incs_valid, phase_names
+
+
+def get_phase_data(sim_data, field_name, phase_name, increments,
+                   transforms=None):
+    phase_data = []
+    incs_valid = []
+    for inc, sim_data in increment_generator(increments, sim_data):
+        data = sim_data.view('phases', phase_name).get(output=field_name)
+
+        if data is None:
+            print(f"Could not find field '{field_name}' for phase "
+                  f"'{phase_name}' and increment {inc} in output data.")
+            continue
+
+        data = apply_transforms(data, transforms, True)
+
+        incs_valid.append(inc)
+        phase_data.append(data)
+
+    phase_data = np.array(phase_data)
+    phase_data = apply_transforms(phase_data, transforms, False)
+
+    if field_name == 'O':
+        phase_data = process_damask_orientatons(phase_data)
+
+    return phase_data, incs_valid
+
+
 def get_field_data(sim_data, field_name, increments):
     """Access data from DAMASK result object and place on the simulation grid.
 
@@ -636,23 +721,32 @@ def get_field_data(sim_data, field_name, increments):
         DAMASK simulation result object.
     field_name : str
         Name of data to process.
-    increments : list of int
-        Increment to extract data from. wildcards/empty?
+    increments: list of dict
+        List of increment specifications to extract data from. Values
+        refer to increments in the simulation. Default to all. This is a
+        list of dict one of the following sets of keys:
+            values: list of int
+                List of incremnts to extract
+            ----OR----
+            start: int
+                First increment to extract
+            stop: int
+                Final incremnt to extract (inclusive)
+            step: int
+                Step between increments to extract
 
     """
     nodal_fields = ['u_n']
-    inc_prefix = 'increment_'
 
     cells = tuple(sim_data.cells)
     if field_name in nodal_fields:
-        cells = tuple(i+1 for i in cells)
+        cells = tuple(i + 1 for i in cells)
 
     field_data = []
     incs_valid = []
-    for inc in increments:
-        sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
-
+    for inc, sim_data in increment_generator(increments, sim_data):
         data = sim_data.place(output=field_name, constituents=0)
+
         if data is None:
             print(f"Could not find field '{field_name}' for increment {inc} "
                   f"in output data.")
