@@ -59,9 +59,14 @@ def write_geom(volume_element, geom_path):
     element_material_idx = volume_element['element_material_idx']
 
     grid_size = element_material_idx.shape
-    ve_size = volume_element.get('size') or [1.0, 1.0, 1.0]
-    ve_origin = volume_element.get('origin') or [0.0, 0.0, 0.0]
+    ve_size = volume_element.get('size')
+    ve_origin = volume_element.get('origin')
     num_micros = np.max(element_material_idx) + 1  # element_material_idx is zero-indexed
+
+    if ve_size is None:
+        ve_size = [1.0, 1.0, 1.0]
+    if ve_origin is None:
+        ve_origin = [0.0, 0.0, 0.0]
 
     header_lns = [
         f'grid a {grid_size[0]} b {grid_size[1]} c {grid_size[2]}',
