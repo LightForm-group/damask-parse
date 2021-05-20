@@ -535,12 +535,13 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
 
 
 def parse_inc_specs(inc_specs, sim_data):
-    # nothing specified, default to all
-    if not inc_specs:
-        return sim_data.increments
-
     inc_prefix = 'increment_'
     incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+
+    # nothing specified, default to all
+    if not inc_specs:
+        return incs_in_file
+
     incs = set()
     for inc_spec in inc_specs:
         if any(k in inc_spec for k in ('start', 'stop', 'step')):
