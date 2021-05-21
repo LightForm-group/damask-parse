@@ -16,7 +16,7 @@ Input file writers and output file readers for the crystal plasticity code DAMAS
 - ✅ `read_spectral_stdout`
 - ✅ `read_spectral_stderr`
 - ❌ `read_load`
-- ❌ `read_material`
+- ✅ `read_material`
 
 ### Writers:
 
