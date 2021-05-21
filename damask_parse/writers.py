@@ -7,9 +7,6 @@ from collections import OrderedDict
 import numpy as np
 from ruamel.yaml import YAML
 
-from damask import VTK
-from damask import Rotation
-
 from damask_parse.utils import (
     zeropad,
     format_1D_masked_array,
@@ -59,6 +56,8 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     of the generated file.
 
     """
+    from damask import VTK
+
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
 
@@ -94,6 +93,8 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
         File path to the generated load file.
 
     """
+    from damask import Rotation
+
     load_steps = []
 
     for load_case in load_cases:
