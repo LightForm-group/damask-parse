@@ -544,7 +544,7 @@ def read_HDF5_file(
             func(**op['args'])
 
         # Deal with specific options:
-        if op['opts'].get('add_Mises', {}):
+        if op.get('opts', {}).get('add_Mises', {}):
 
             if op["name"] == 'add_stress_Cauchy':
                 label = 'sigma'
