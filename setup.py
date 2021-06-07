@@ -42,7 +42,7 @@ setup(
     author_email='adam.plowman@manchester.ac.uk',
     packages=find_packages(),
     install_requires=[
-        'numpy',
+        'numpy>=1.17.5', # damask python packages used `np.random.default_rng()` which seems to appear first in 1.17
         'pandas',
         'h5py',
         'damask',
