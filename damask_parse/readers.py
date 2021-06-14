@@ -512,7 +512,7 @@ def read_HDF5_file(
             args : dict
                 Parameter names and their values to pass to the DADF5 method. This
                 assumes all DADF5 method parameters are of positional-or-keyword type.
-            opts : dict
+            opts : dict, optional
                 Additional options.
 
     Returns
