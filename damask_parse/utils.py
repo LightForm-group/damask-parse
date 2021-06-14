@@ -534,6 +534,20 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         return all_data
 
 
+def normalise_inc(inc, incs_in_file, default=0):
+    """Convert a negative increment index into an increment integer."""
+    if inc < 0:
+        # Interpret as a negative index instead of an actual increment:
+        inc_idx = len(incs_in_file) + inc
+        try:
+            inc = incs_in_file[inc_idx]
+        except IndexError:
+            print(f'Negative increment index {inc} does not index the available '
+                  f'increments. Using increment {default} instead.')
+            inc = default
+    return inc
+
+
 def parse_inc_specs(inc_specs, sim_data):
     inc_prefix = 'increment_'
     incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
@@ -550,13 +564,24 @@ def parse_inc_specs(inc_specs, sim_data):
                       "should be given in an increment specification, not "
                       "both. Interpreting as a range.")
 
-            start = inc_spec.get('start', 0)
-            stop = inc_spec.get('stop', incs_in_file[-1])
+            start = normalise_inc(
+                inc_spec.get('start', 0),
+                incs_in_file,
+                default=0,
+            )
+            stop = normalise_inc(
+                inc_spec.get('stop', incs_in_file[-1]),
+                incs_in_file,
+                default=incs_in_file[-1],
+            )
             step = inc_spec.get('step', 1)
+            if step < 0:
+                step = 1
+                print("Cannot have negative increment step size, using unit step size.")
             new_incs = range(start, stop + 1, step)
 
         elif 'values' in inc_spec:
-            new_incs = inc_spec['values']
+            new_incs = [normalise_inc(i, incs_in_file) for i in inc_spec['values']]
 
         else:
             print("Unknown increment specification.")
