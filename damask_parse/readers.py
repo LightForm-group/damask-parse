@@ -596,7 +596,9 @@ def read_HDF5_file(
             continue
 
         # Get out_name or construct out_name
-        if out_name is None:
+        if out_name is None or out_name in volume_response:
+            if out_name in volume_response:
+                print(f'`out_name` "{out_name}" already exists. Generating a new name.')
             out_name = [field_name]
             out_name += [f'{op}_{axis}' for t in transforms or []
                          for op, axis in t.items()]
@@ -630,7 +632,9 @@ def read_HDF5_file(
             continue
 
         # Get out_name or construct out_name
-        if out_name is None:
+        if out_name is None or out_name in phase_response:
+            if out_name in phase_response:
+                print(f'`out_name` "{out_name}" already exists. Generating a new name.')
             out_name = [field_name, phase_name]
             out_name += [f'{op}_{axis}' for t in transforms or []
                          for op, axis in t.items()]
