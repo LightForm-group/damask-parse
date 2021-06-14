@@ -398,7 +398,7 @@ def read_HDF5_file(
     hdf5_path : Path or str
         Path to the HDF5 file.
     incremental_data : list of dict, optional
-        (Depreciated) List of incremental data to extract from the HDF5 file.
+        (Deprecated) List of incremental data to extract from the HDF5 file.
         This is a list of dicts with the following keys:
             name: str
                 The name by which the quantity will be stored in the output dict.
@@ -591,7 +591,7 @@ def read_HDF5_file(
         vol_dat, increments, phase_names = get_vol_data(
             sim_data, field_name, spec.get('increments'), transforms=transforms
         )
-        # No incements returned, contiue to next
+        # No increments returned, continue to next
         if not increments:
             continue
 
@@ -625,7 +625,7 @@ def read_HDF5_file(
             sim_data, field_name, phase_name, spec.get('increments'),
             transforms=transforms
         )
-        # No incements returned, contiue to next
+        # No increments returned, continue to next
         if not increments:
             continue
 
@@ -676,7 +676,7 @@ def read_HDF5_file(
             field_dat, increments = get_field_data(
                 sim_data, field_name, spec.get('increments')
             )
-            # No incements returned, contiue to next
+            # No increments returned, continue to next
             if not increments:
                 continue
             field_meta = {'increments': increments}
@@ -697,7 +697,7 @@ def read_HDF5_file(
             try:
                 field_dat = field_response[field_name]
             except KeyError:
-                # No incements returned in field response, contiue to next
+                # No increments returned in field response, continue to next
                 continue
             increments = field_dat['meta']['increments']
             field_dat = field_dat['data']
@@ -706,7 +706,7 @@ def read_HDF5_file(
             field_dat, increments = get_field_data(
                 sim_data, field_name, spec.get('increments')
             )
-            # No incements returned, contiue to next
+            # No increments returned, continue to next
             if not increments:
                 continue
 
