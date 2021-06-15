@@ -61,8 +61,12 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
     grid_size = element_material_idx.shape
-    ve_size = volume_element.get('size') or [1.0, 1.0, 1.0]
-    ve_origin = volume_element.get('origin') or [0.0, 0.0, 0.0]
+    ve_size = volume_element.get('size')
+    ve_origin = volume_element.get('origin')
+    if ve_size is None:
+        ve_size = [1.0, 1.0, 1.0]
+    if ve_origin is None:
+        ve_origin = [0.0, 0.0, 0.0]
 
     dir_path = Path(dir_path).resolve()
     geom_path = dir_path.joinpath(name)
