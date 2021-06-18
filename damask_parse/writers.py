@@ -104,14 +104,17 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
 
         def_grad_aim = load_case.get('def_grad_aim')
         def_grad_rate = load_case.get('def_grad_rate')
+        vel_grad = load_case.get('vel_grad')
         stress = load_case.get('stress')
         rot = load_case.get('rotation')
         total_time = load_case['total_time']
         num_increments = load_case['num_increments']
         freq = load_case.get('dump_frequency', 1)
 
-        if def_grad_aim is not None and def_grad_rate is not None:
-            msg = 'Specify only one of `def_grad_rate` and `def_grad_aim`.'
+        if sum((x is not None
+                for x in (def_grad_aim, def_grad_rate, vel_grad))) > 1:
+            msg = ('Specify only one of `def_grad_rate`,  `def_grad_aim` '
+                   'and `vel_grad`.')
             raise ValueError(msg)
 
         stress_symbol = 'P'
@@ -127,6 +130,9 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
         elif def_grad_rate is not None:
             dg_arr = def_grad_rate
             dg_arr_sym = 'dot_F'
+        elif vel_grad is not None:
+            dg_arr = vel_grad
+            dg_arr_sym = 'L'
 
         if isinstance(dg_arr, list):
             dg_arr = np.array(dg_arr)
@@ -141,7 +147,8 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
         if stress is None:
 
             if dg_arr is None:
-                msg = 'Specify one of `def_grad_rate` or `def_grad_aim.'
+                msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
+                       '`vel_grad`.')
                 raise ValueError(msg)
 
             if isinstance(dg_arr, np.ma.core.MaskedArray):
@@ -155,23 +162,31 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
             if isinstance(stress, np.ma.core.MaskedArray):
 
                 if dg_arr is None:
-                    msg = 'Specify one of `def_grad_rate` or `def_grad_aim.'
+                    msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
+                           '`vel_grad`.')
                     raise ValueError(msg)
 
-                msg = ('`def_grad_rate` or `def_grad_aim` must be component-wise exclusive '
-                       'with `stress` (both as masked arrays)')
+                msg = ('`def_grad_rate`, `def_grad_aim` or `vel_grad` must be '
+                       'component-wise exclusive with `stress` (both as '
+                       'masked arrays)')
                 if not isinstance(dg_arr, np.ma.core.MaskedArray):
                     raise ValueError(msg)
                 if np.any(dg_arr.mask == stress.mask):
                     raise ValueError(msg)
+
+                if dg_arr_sym == 'L':
+                    if any((sum(row) not in (0, 3) for row in dg_arr.mask)):
+                        msg = ('Specify all or no values for each row of '
+                               '`vel_grad`')
+                        raise ValueError(msg)
 
                 bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
                 bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
 
             else:
                 if dg_arr is not None:
-                    msg = ('To use mixed boundary conditions, `stress` must be passed as a '
-                           'masked array.')
+                    msg = ('To use mixed boundary conditions, `stress` must '
+                           'be passed as a masked array.')
                     raise ValueError(msg)
 
                 bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
