@@ -535,14 +535,15 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
 
 
 def normalise_inc(inc, incs_in_file, default=0):
-    """Convert a negative increment index into an increment integer."""
+    """Convert a negative increment by counting backwards from the final
+    increment."""
     if inc < 0:
-        # Interpret as a negative index instead of an actual increment:
-        inc_idx = len(incs_in_file) + inc
-        try:
-            inc = incs_in_file[inc_idx]
-        except IndexError:
-            print(f'Negative increment index {inc} does not index the available '
+        # Count backwards from the final incremnt:
+        final_inc = incs_in_file[-1]
+        inc = final_inc + inc + 1
+
+        if inc < 0:
+            print(f'Negative increment {inc} is out of range of the available '
                   f'increments. Using increment {default} instead.')
             inc = default
     return inc
