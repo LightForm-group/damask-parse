@@ -2,9 +2,20 @@
 
 ## [0.2.11] - 2021.xx.xx
 
+### Added
+
+- Writing of loadcase defined by a velocity gradient.
+
 ### Changed
 
 - Allow passing deformation gradient (rate) as a nested list to `writers.write_load_case`.
+- Updates for use with latest alpha version of damask (v3a3) - writing yaml load file and vtr geom file.
+- Updates to parsing damask simulation results back to a volume element response dict - added new data specification types:
+  - volume_data - Data from a given field over entire VE with transformations applied (to partly replace incremental_data)
+  - phase_data - Data from a given field over a single phase of the VE with transformations applied (to partly replace incremental_data)
+  - field_data - Data from a given field in correct order/shape as the VE dimensions. Can also output a grain and phase map.
+  - grain_data - Data from a given field averaged over each grain in the VE
+All use a consistent definition of the increments to extract from, based on the increment number in the simulation.
 
 ### Fixed
 
