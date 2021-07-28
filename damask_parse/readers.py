@@ -2,24 +2,19 @@
 
 from pathlib import Path
 
-import pandas
 import re
 import numpy as np
 from ruamel.yaml import YAML
 
 from damask_parse.utils import (
-    get_header_lines,
-    get_num_header_lines,
     get_HDF5_incremental_quantity,
     validate_volume_element,
-    validate_element_material_idx,
     get_field_data,
     get_vol_data,
     get_phase_data,
     reshape_field_data,
     apply_grain_average,
 )
-from damask_parse.legacy.readers import parse_microstructure, parse_texture_gauss
 
 __all__ = [
     'read_geom',
@@ -755,7 +750,7 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations):
             unit_cell_alignment : dict
                 Alignment of the unit cell.
             P : int, optional
-                The "P" constant, either +1 or -1, as defined within [1].                
+                The "P" constant, either +1 or -1, as defined within [1].
 
     Returns
     -------

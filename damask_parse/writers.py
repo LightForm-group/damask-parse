@@ -248,7 +248,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
                     quaternions : ndarray of shape (R, 4) of float, optional
                         Array of R row four-vectors of unit quaternions. Specify either
                         `quaternions` or `euler_angles`.
-                    euler_angles : ndarray of shape (R, 3) of float, optional            
+                    euler_angles : ndarray of shape (R, 3) of float, optional
                         Array of R row three-vectors of Euler angles in degrees or radians,
                         as determined by `euler_degrees`. Specify either `quaternions` or
                         `euler_angles`. Specified as proper Euler angles in the Bunge
@@ -318,7 +318,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
       under some homogenization scheme. For a full-field simulation, there will be only
       one constituent per "material" (and no associated homogenization).
 
-    - The input `volume_element` can be either fully specified with respect to the 
+    - The input `volume_element` can be either fully specified with respect to the
       `constituent_*` keys or, if no `constituent_*` keys are specified, but the
       `element_material_idx` and `grid_size` keys are specified, we assume the model to be
       a full-field model for which each material contains precisely one constituent. In

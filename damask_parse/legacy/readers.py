@@ -8,6 +8,9 @@ from damask_parse.utils import get_header_lines
 
 __all__ = [
     'read_table',
+    'parse_microstructure',
+    'parse_texture_gauss',
+    'read_geom',
 ]
 
 
