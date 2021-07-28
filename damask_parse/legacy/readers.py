@@ -231,3 +231,150 @@ def parse_texture_gauss(texture_str):
     }
 
     return texture
+
+
+def read_geom(geom_path):
+    """Parse a DAMASK geometry file into a volume element.
+
+    Parameters
+    ----------
+    geom_path : str or Path
+        Path to the DAMASK geometry file.
+
+    Returns
+    -------
+    geometry : dict
+        Dictionary of the parsed data from the geometry file, with keys:
+            element_material_idx : ndarray of shape equal to `grid_size` of int
+                A mapping that determines the grain index for each voxel.
+            grid_size : ndarray of int of size 3
+                Resolution of volume element discretisation in each direction.
+            size : list of length 3
+                Volume element size. By default set to unit size: [1, 1, 1].
+            origin : list of length 3
+                Volume element origin. By default: [0, 0, 0].
+            material_homog_idx : 1D ndarray of str
+                Determines the homogenization scheme for each material.
+            orientations : dict
+                Dict containing the following keys:
+                    type : "euler"
+                    euler_angles : ndarray of shape (R, 3) of float
+                        Array of R row three-vectors of Euler angles. Specified as proper
+                        Euler angles in the Bunge convention. (Rotations are about Z,
+                        new X, new new Z.)
+                    unit_cell_alignment : dict
+                        Alignment of the unit cell.
+                    euler_degrees : bool
+                        If True, `euler_angles` are represented in degrees, rather than
+                        radians.
+            constituent_phase_label_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a constituent to its phase index.
+            constituent_orientation_idx : 1D ndarray of int
+                Zero-indexed integer index array mapping a constituent to its orientation
+                index.
+            meta : dict
+                Any meta information associated with the generation of this volume
+                element.
+
+    """
+
+    num_header = get_num_header_lines(geom_path)
+
+    with Path(geom_path).open('r') as handle:
+
+        lines = handle.read()
+
+        grid_size = None
+        grid_pat = r'grid\s+a\s+(\d+)\s+b\s+(\d+)\s+c\s+(\d+)'
+        grid_match = re.search(grid_pat, lines)
+        if grid_match:
+            grid_size = [int(i) for i in grid_match.groups()]
+        else:
+            raise ValueError('`grid` not specified in file.')
+
+        element_material_idx = []
+        for ln_idx, ln in enumerate(lines.splitlines()):
+            ln_split = ln.strip().split()
+            if ln_idx > num_header:
+                element_material_idx.extend([int(i) for i in ln_split])
+
+        element_material_idx = np.array(element_material_idx).reshape(grid_size[::-1])
+        element_material_idx = element_material_idx.swapaxes(0, 2)
+        num_mats = validate_element_material_idx(element_material_idx)
+
+        constituent_phase_label_idx = None
+        constituent_orientation_idx = None
+        pat = r'\<microstructure\>[\s\S]*\(constituent\).*'
+        ms_match = re.search(pat, lines)
+        if ms_match:
+            ms_str = ms_match.group()
+            microstructure = parse_microstructure(ms_str)
+            constituent_phase_label_idx = microstructure['phase_idx']
+            constituent_orientation_idx = microstructure['texture_idx']
+
+        orientations = None
+        pat = r'\<texture\>[\s\S]*\(gauss\).*'
+        texture_match = re.search(pat, lines)
+        if texture_match:
+            texture_str = texture_match.group()
+            texture_gauss = parse_texture_gauss(texture_str)
+            orientations = {
+                'type': 'euler',
+                'euler_angles': texture_gauss['euler_angles'],
+                'euler_degrees': texture_gauss['euler_degrees'],
+                'euler_angle_labels': texture_gauss['euler_angle_labels'],
+                'unit_cell_alignment': {
+                    'x': 'a',
+                    'z': 'c',
+                }
+            }
+
+        # Check indices in `constituent_orientation_idx` are valid, given `orientations`:
+        if ms_match and (
+            np.min(constituent_orientation_idx) < 0 or
+            np.max(constituent_orientation_idx) > len(orientations['euler_angles'])
+        ):
+            msg = 'Orientation indices in `constituent_orientation_idx` are invalid.'
+            raise ValueError(msg)
+
+        # Parse header information:
+        size_pat = (r'size\s+x\s+(\d+(?:\.\d+)*)'
+                    r'\s+y\s+(\d+(?:\.\d+)*)\s+z\s+(\d+(?:\.\d+)*)')
+        size_match = re.search(size_pat, lines)
+        size = None
+        if size_match:
+            size = [float(i) for i in size_match.groups()]
+
+        origin_pat = r'origin\s+x\s+(\d+\.\d+)\s+y\s+(\d+\.\d+)\s+z\s+(\d+\.\d+)'
+        origin_match = re.search(origin_pat, lines)
+        origin = None
+        if origin_match:
+            origin = [float(i) for i in origin_match.groups()]
+
+        homo_pat = r'homogenization\s+(\d+)'
+        homo_match = re.search(homo_pat, lines)
+        material_homog_idx = None
+        if homo_match:
+            # Same homogenization for each material ID:
+            homog_idx = int(homo_match.group(1)) - 1  # zero-indexed
+            material_homog_idx = np.zeros(num_mats).astype(int) + homog_idx
+
+        com_pat = r'(geom_.*)'
+        commands = re.findall(com_pat, lines)
+
+        geometry = {
+            'grid_size': grid_size,
+            'size': size,
+            'origin': origin,
+            'orientations': orientations,
+            'element_material_idx': element_material_idx,
+            'material_homog_idx': material_homog_idx,
+            'constituent_phase_label_idx': constituent_phase_label_idx,
+            'constituent_orientation_idx': constituent_orientation_idx,
+            'meta': {
+                'num_header': num_header,
+                'commands': commands,
+            },
+        }
+
+    return geometry

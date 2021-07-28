@@ -56,11 +56,10 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     of the generated file.
 
     """
-    from damask import VTK
+    from damask import Grid
 
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
-    grid_size = element_material_idx.shape
     ve_size = volume_element.get('size')
     ve_origin = volume_element.get('origin')
     if ve_size is None:
@@ -71,9 +70,9 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     dir_path = Path(dir_path).resolve()
     geom_path = dir_path.joinpath(name)
 
-    geom_vtk = VTK.from_rectilinear_grid(grid_size, ve_size, ve_origin)
-    geom_vtk.add(element_material_idx.flatten(order='F'), 'material')
-    geom_vtk.save(geom_path, parallel=False, compress=True)
+    ve_grid = Grid(material=element_material_idx, size=ve_size,
+                   origin=ve_origin)
+    ve_grid.save(geom_path)
 
     return geom_path
 
