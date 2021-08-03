@@ -235,7 +235,7 @@ def format_1D_masked_array(arr, fill_symbol='x'):
             else fill_symbol for x in arr]
 
 
-def masked_array_from_list(arr, fill_value='*'):
+def masked_array_from_list(arr, fill_value='x'):
     """Generate a (masked) array from a 1D list whose elements may contain a fill value."""
 
     data = np.empty(len(arr))
