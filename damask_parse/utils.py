@@ -228,18 +228,11 @@ def check_volume_elements_equal(vol_elem_a, vol_elem_b):
     return True
 
 
-def format_1D_masked_array(arr, fmt='{:.10g}', fill_symbol='*'):
+def format_1D_masked_array(arr, fill_symbol='x'):
     'Also formats non-masked array.'
 
-    arr_fmt = ''
-    for idx, i in enumerate(arr):
-        if idx > 0:
-            arr_fmt += ' '
-        if isinstance(i, np.ma.core.MaskedConstant):
-            arr_fmt += '*'
-        else:
-            arr_fmt += fmt.format(i)
-    return arr_fmt
+    return [x.item() if not isinstance(x, np.ma.core.MaskedConstant)
+            else fill_symbol for x in arr]
 
 
 def masked_array_from_list(arr, fill_value='*'):
@@ -538,34 +531,313 @@ def get_HDF5_incremental_quantity(hdf5_path, dat_path, transforms=None, incremen
         be extracted.
 
     """
-
     with h5py.File(str(hdf5_path), 'r') as f:
-
         incs = [i for i in f.keys() if 'inc' in i]
         incs = sorted(incs, key=lambda i: int(re.search(r'\d+', i).group()))
-        data = np.array([f[i][dat_path][()] for i in incs])[::increments]
+        incs = incs[::increments]
 
-        # flatten structured datatype for orientations
+        all_data = []
+        for inc in incs:
+            data = f[inc][dat_path][()]
+            data = apply_transforms(data, transforms, True)
+            all_data.append(data)
+
+        all_data = np.array(all_data)
+        # Apply any transforms on the increment axis
+        all_data = apply_transforms(all_data, transforms, False)
+
         if dat_path.split('/')[-1] == 'O':
-            data = data.view((data.dtype[data.dtype.names[0]], len(data.dtype)))
+            all_data = process_damask_orientatons(all_data)
 
-            # cast to orientation dict
-            data = {
-                'type': 'quat',
-                'quaternions': data,  # P=-1 convention
-                'unit_cell_alignment': {'x': 'a'},
-                'P': -1,
-            }
+        return all_data
 
-        # transform options don't really apply to orientations
-        elif transforms:
-            for i in transforms:
-                if 'mean_along_axes' in i:
-                    data = np.mean(data, i['mean_along_axes'])
-                if 'sum_along_axes' in i:
-                    data = np.sum(data, i['sum_along_axes'])
 
+def normalise_inc(inc, incs_in_file, default=0):
+    """Convert a negative increment by counting backwards from the final
+    increment."""
+    if inc < 0:
+        # Count backwards from the final incremnt:
+        final_inc = incs_in_file[-1]
+        inc = final_inc + inc + 1
+
+        if inc < 0:
+            print(f'Negative increment {inc} is out of range of the available '
+                  f'increments. Using increment {default} instead.')
+            inc = default
+    return inc
+
+
+def parse_inc_specs(inc_specs, sim_data):
+    inc_prefix = 'increment_'
+    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+
+    # nothing specified, default to all
+    if not inc_specs:
+        return incs_in_file
+
+    incs = set()
+    for inc_spec in inc_specs:
+        if any(k in inc_spec for k in ('start', 'stop', 'step')):
+            if 'values' in inc_spec:
+                print("Only 'values' or a range ('start', 'stop', 'step') "
+                      "should be given in an increment specification, not "
+                      "both. Interpreting as a range.")
+
+            start = normalise_inc(
+                inc_spec.get('start', 0),
+                incs_in_file,
+                default=0,
+            )
+            stop = normalise_inc(
+                inc_spec.get('stop', incs_in_file[-1]),
+                incs_in_file,
+                default=incs_in_file[-1],
+            )
+            step = inc_spec.get('step', 1)
+            if step < 0:
+                step = 1
+                print("Cannot have negative increment step size, using unit step size.")
+            new_incs = range(start, stop + 1, step)
+
+        elif 'values' in inc_spec:
+            new_incs = [normalise_inc(i, incs_in_file) for i in inc_spec['values']]
+
+        else:
+            print("Unknown increment specification.")
+            continue
+
+        incs = incs.union(set(new_incs))
+
+    incs_in_file = incs.intersection(set(incs_in_file))
+    incs_missing = incs.difference(incs_in_file)
+    if incs_missing:
+        print("These requested increments were not found: ",
+              sorted(list(incs_missing)))
+
+    return sorted(list(incs_in_file))
+
+
+def apply_transforms(data, transforms, single_inc):
+    if data.size == 0:
         return data
+
+    for transform in transforms or []:
+        for op, axis in transform.items():
+            if axis == 0 and not single_inc:
+                shift = 0
+            elif axis > 0 and single_inc:
+                shift = -1
+            else:
+                continue
+
+            if axis + shift >= data.ndim:
+                print(f"Could not apply '{op}' on axis {axis}.")
+
+            if op == 'mean_along_axes':
+                data = np.mean(data, axis + shift)
+            elif op == 'sum_along_axes':
+                data = np.sum(data, axis + shift)
+
+    return data
+
+
+def process_damask_orientatons(ori_data):
+    # cast to orientation dict
+    return {
+        'type': 'quat',
+        'quaternions': ori_data,
+        'unit_cell_alignment': {'x': 'a'},
+        'P': -1,
+    }
+
+
+def increment_generator(increments, sim_data):
+    inc_prefix = 'increment_'
+
+    for inc in parse_inc_specs(increments, sim_data):
+        sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
+
+        yield inc, sim_data
+
+
+def reshape_field_data(field_data, new_shape):
+    """Reshape data array to VE dimensions
+
+    Parameters
+    ----------
+    field_data : np.ndarray
+        Data array to reshape, shape (N, ...).
+    new_shape : tuple
+        Shape of output, must be compatible with N.
+
+    """
+    # # reshape to make x,y,z contiguous in memory (numpy row major)
+    # # dimensions: 0,1: tensor components, 2: x-pos, 3: y-pos, 4: z-pos
+    # old_shape = field_data.shape
+    # if len(old_shape) > 1 and old_shape[1:] != (1,):
+    #     new_shape = old_shape[1:] + new_shape
+    # return np.ascontiguousarray(field_data.T.reshape(new_shape, order='F'))
+    # or reshape to make tensor components contiguous in memory (numpy row major)
+    # dimensions: 0: x-pos, 1: y-pos, 2: z-pos 3,4: tensor components
+    old_shape = field_data.shape
+    if len(old_shape) > 1 and old_shape[1:] != (1,):
+        new_shape += old_shape[1:]
+    return np.ascontiguousarray(field_data.reshape(new_shape, order='F'))
+    # this seems more inline with what is already done with `incremental_data`
+    # dims (incs, spatial, tensor comps)
+
+
+def get_vol_data(sim_data, field_name, increments, transforms=None):
+    from damask.util import dict_flatten
+
+    vol_data = []
+    incs_valid = []
+    first_inc = True
+    phase_names = []
+    for inc, sim_data in increment_generator(increments, sim_data):
+        data = sim_data.get(output=field_name, flatten=(not first_inc))
+
+        if data is None:
+            print(f"Could not find field '{field_name}' for increment "
+                  f"{inc} in output data.")
+            continue
+
+        # get names of phases in the output
+        if first_inc:
+            data = next(iter(data.values()))  # get only inc
+            try:
+                phase_names = list(data['phase'].keys())
+            except KeyError:
+                pass
+            data = dict_flatten(data)
+            first_inc = False
+
+        if isinstance(data, dict):
+            data = np.vstack([dat for dat in data.values()])
+        elif not isinstance(data, np.ndarray):
+            continue   # something isn't right, move to next
+
+        data = apply_transforms(data, transforms, True)
+
+        incs_valid.append(inc)
+        vol_data.append(data)
+
+    vol_data = np.array(vol_data)
+    vol_data = apply_transforms(vol_data, transforms, False)
+
+    if field_name == 'O':
+        vol_data = process_damask_orientatons(vol_data)
+
+    return vol_data, incs_valid, phase_names
+
+
+def get_phase_data(sim_data, field_name, phase_name, increments,
+                   transforms=None):
+    phase_data = []
+    incs_valid = []
+    for inc, sim_data in increment_generator(increments, sim_data):
+        data = sim_data.view('phases', phase_name).get(output=field_name)
+
+        if data is None:
+            print(f"Could not find field '{field_name}' for phase "
+                  f"'{phase_name}' and increment {inc} in output data.")
+            continue
+
+        data = apply_transforms(data, transforms, True)
+
+        incs_valid.append(inc)
+        phase_data.append(data)
+
+    phase_data = np.array(phase_data)
+    phase_data = apply_transforms(phase_data, transforms, False)
+
+    if field_name == 'O':
+        phase_data = process_damask_orientatons(phase_data)
+
+    return phase_data, incs_valid
+
+
+def get_field_data(sim_data, field_name, increments):
+    """Access data from DAMASK result object and place on the simulation grid.
+
+    Parameters
+    ----------
+    sim_data : damask.Result
+        DAMASK simulation result object.
+    field_name : str
+        Name of data to process.
+    increments: list of dict
+        List of increment specifications to extract data from. Values
+        refer to increments in the simulation. Default to all. This is a
+        list of dict one of the following sets of keys:
+            values: list of int
+                List of incremnts to extract
+            ----OR----
+            start: int
+                First increment to extract
+            stop: int
+                Final incremnt to extract (inclusive)
+            step: int
+                Step between increments to extract
+
+    """
+    nodal_fields = ['u_n']
+
+    cells = tuple(sim_data.cells)
+    if field_name in nodal_fields:
+        cells = tuple(i + 1 for i in cells)
+
+    field_data = []
+    incs_valid = []
+    for inc, sim_data in increment_generator(increments, sim_data):
+        data = sim_data.place(output=field_name, constituents=0)
+
+        if data is None:
+            print(f"Could not find field '{field_name}' for increment {inc} "
+                  f"in output data.")
+            continue
+
+        data = data.data
+        data = reshape_field_data(data, cells)
+
+        incs_valid.append(inc)
+        field_data.append(data)
+
+    # convert list of array
+    # index order (incs, spatial_comps, tensor_comps)
+    field_data = np.array(field_data)
+
+    if field_name == 'O':
+        field_data = process_damask_orientatons(field_data)
+
+    return field_data, incs_valid
+
+
+def apply_grain_average(field_data, grains, is_oris=False):
+    # grain_data
+    grain_data = []
+    if is_oris:
+        if field_data['type'] != 'quat':
+            raise ValueError('Only quaternion orientations can be averaged.')
+        meta_data = {k: v for k, v in field_data.items() if k != 'quaternions'}
+        field_data = field_data['quaternions']
+
+        for grain in np.unique(grains):
+            grain_data.append(field_data[:, grains == grain].sum(axis=1))
+        grain_data = np.array(grain_data).swapaxes(0, 1)
+        grain_data /= np.linalg.norm(grain_data, axis=2)[..., np.newaxis]
+
+        grain_data = {
+            'quaternions': grain_data
+        }
+        grain_data.update(meta_data)
+    else:
+        for grain in np.unique(grains):
+            grain_data.append(field_data[:, grains == grain].mean(axis=1))
+        grain_data = np.array(grain_data).swapaxes(0, 1)
+
+    # index order (incs, grains, tensor_comps)
+    return grain_data
 
 
 def validate_orientations(orientations):
@@ -1141,7 +1413,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
             mat_i_const_j_phase = str(const_phase_lab[const_idx])
             mat_i_const_j_ori = all_quats[const_ori_idx[const_idx]]
 
-            if phases[mat_i_const_j_phase]['lattice'] == 'hex':
+            if phases[mat_i_const_j_phase]['lattice'] == 'hP':
 
                 if 'unit_cell_alignment' not in volume_element['orientations']:
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
@@ -1171,8 +1443,8 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                 mat_i_const_j_ori[1:] *= -1
 
             mat_i_const_j = {
-                'fraction': float(const_mat_frac[const_idx]),
-                'orientation': mat_i_const_j_ori.tolist(),
+                'v': float(const_mat_frac[const_idx]),
+                'O': mat_i_const_j_ori.tolist(),
                 'phase': mat_i_const_j_phase,
             }
             mat_i_constituents.append(mat_i_const_j)
@@ -1209,7 +1481,7 @@ def prepare_material_yaml_data(mat_dat):
         Dict with keys:
             phases
             homogenization
-            microstructure
+            material
 
     Returns
     -------
@@ -1225,10 +1497,10 @@ def prepare_material_yaml_data(mat_dat):
 
     mat_dat_fmt = copy.deepcopy(mat_dat)
 
-    for material in mat_dat_fmt['microstructure']:
+    for material in mat_dat_fmt['material']:
         for const in material['constituents']:
             ori_list = []
-            for ori in const['orientation']:
+            for ori in const['O']:
                 kwargs = {
                     'width': ORI_NUM_DP + 2,
                     'prec': 1,
@@ -1241,6 +1513,6 @@ def prepare_material_yaml_data(mat_dat):
                         'width': kwargs['width'] + 1,
                     })
                 ori_list.append(ruamel.yaml.scalarfloat.ScalarFloat(ori, **kwargs))
-            const['orientation'] = ori_list
+            const['O'] = ori_list
 
     return mat_dat_fmt

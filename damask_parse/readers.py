@@ -2,19 +2,19 @@
 
 from pathlib import Path
 
-import pandas
 import re
 import numpy as np
 from ruamel.yaml import YAML
 
 from damask_parse.utils import (
-    get_header_lines,
-    get_num_header_lines,
     get_HDF5_incremental_quantity,
     validate_volume_element,
-    validate_element_material_idx,
+    get_field_data,
+    get_vol_data,
+    get_phase_data,
+    reshape_field_data,
+    apply_grain_average,
 )
-from damask_parse.legacy.readers import parse_microstructure, parse_texture_gauss
 
 __all__ = [
     'read_geom',
@@ -143,7 +143,7 @@ def parse_increment(inc_str):
 
 
 def read_geom(geom_path):
-    """Parse a DAMASK geometry file into a volume element.
+    """Parse a DAMASK VTR geometry file into a volume element.
 
     Parameters
     ----------
@@ -162,130 +162,24 @@ def read_geom(geom_path):
                 Volume element size. By default set to unit size: [1, 1, 1].
             origin : list of length 3
                 Volume element origin. By default: [0, 0, 0].
-            material_homog_idx : 1D ndarray of str
-                Determines the homogenization scheme for each material.
-            orientations : dict
-                Dict containing the following keys:
-                    type : "euler"
-                    euler_angles : ndarray of shape (R, 3) of float
-                        Array of R row three-vectors of Euler angles. Specified as proper
-                        Euler angles in the Bunge convention. (Rotations are about Z,
-                        new X, new new Z.)
-                    unit_cell_alignment : dict
-                        Alignment of the unit cell.
-                    euler_degrees : bool
-                        If True, `euler_angles` are represented in degrees, rather than
-                        radians.
-            constituent_phase_label_idx : 1D ndarray of int
-                Zero-indexed integer index array mapping a constituent to its phase index.
-            constituent_orientation_idx : 1D ndarray of int
-                Zero-indexed integer index array mapping a constituent to its orientation
-                index.
             meta : dict
-                Any meta information associated with the generation of this volume
-                element.
+                Any meta information associated with the generation of this
+                volume element.
 
     """
+    from damask import Grid
 
-    num_header = get_num_header_lines(geom_path)
+    ve_grid = Grid.load(geom_path)
 
-    with Path(geom_path).open('r') as handle:
-
-        lines = handle.read()
-
-        grid_size = None
-        grid_pat = r'grid\s+a\s+(\d+)\s+b\s+(\d+)\s+c\s+(\d+)'
-        grid_match = re.search(grid_pat, lines)
-        if grid_match:
-            grid_size = [int(i) for i in grid_match.groups()]
-        else:
-            raise ValueError('`grid` not specified in file.')
-
-        element_material_idx = []
-        for ln_idx, ln in enumerate(lines.splitlines()):
-            ln_split = ln.strip().split()
-            if ln_idx > num_header:
-                element_material_idx.extend([int(i) for i in ln_split])
-
-        element_material_idx = np.array(element_material_idx).reshape(grid_size[::-1])
-        element_material_idx = element_material_idx.swapaxes(0, 2)
-        element_material_idx -= 1  # zero-indexed
-        num_mats = validate_element_material_idx(element_material_idx)
-
-        constituent_phase_label_idx = None
-        constituent_orientation_idx = None
-        pat = r'\<microstructure\>[\s\S]*\(constituent\).*'
-        ms_match = re.search(pat, lines)
-        if ms_match:
-            ms_str = ms_match.group()
-            microstructure = parse_microstructure(ms_str)
-            constituent_phase_label_idx = microstructure['phase_idx']
-            constituent_orientation_idx = microstructure['texture_idx']
-
-        orientations = None
-        pat = r'\<texture\>[\s\S]*\(gauss\).*'
-        texture_match = re.search(pat, lines)
-        if texture_match:
-            texture_str = texture_match.group()
-            texture_gauss = parse_texture_gauss(texture_str)
-            orientations = {
-                'type': 'euler',
-                'euler_angles': texture_gauss['euler_angles'],
-                'euler_degrees': texture_gauss['euler_degrees'],
-                'euler_angle_labels': texture_gauss['euler_angle_labels'],
-                'unit_cell_alignment': {
-                    'x': 'a',
-                    'z': 'c',
-                }
-            }
-
-        # Check indices in `constituent_orientation_idx` are valid, given `orientations`:
-        if ms_match and (
-            np.min(constituent_orientation_idx) < 0 or
-            np.max(constituent_orientation_idx) > len(orientations['euler_angles'])
-        ):
-            msg = 'Orientation indices in `constituent_orientation_idx` are invalid.'
-            raise ValueError(msg)
-
-        # Parse header information:
-        size_pat = (r'size\s+x\s+(\d+(?:\.\d+)*)'
-                    r'\s+y\s+(\d+(?:\.\d+)*)\s+z\s+(\d+(?:\.\d+)*)')
-        size_match = re.search(size_pat, lines)
-        size = None
-        if size_match:
-            size = [float(i) for i in size_match.groups()]
-
-        origin_pat = r'origin\s+x\s+(\d+\.\d+)\s+y\s+(\d+\.\d+)\s+z\s+(\d+\.\d+)'
-        origin_match = re.search(origin_pat, lines)
-        origin = None
-        if origin_match:
-            origin = [float(i) for i in origin_match.groups()]
-
-        homo_pat = r'homogenization\s+(\d+)'
-        homo_match = re.search(homo_pat, lines)
-        material_homog_idx = None
-        if homo_match:
-            # Same homogenization for each material ID:
-            homog_idx = int(homo_match.group(1)) - 1  # zero-indexed
-            material_homog_idx = np.zeros(num_mats).astype(int) + homog_idx
-
-        com_pat = r'(geom_.*)'
-        commands = re.findall(com_pat, lines)
-
-        geometry = {
-            'grid_size': grid_size,
-            'size': size,
-            'origin': origin,
-            'orientations': orientations,
-            'element_material_idx': element_material_idx,
-            'material_homog_idx': material_homog_idx,
-            'constituent_phase_label_idx': constituent_phase_label_idx,
-            'constituent_orientation_idx': constituent_orientation_idx,
-            'meta': {
-                'num_header': num_header,
-                'commands': commands,
-            },
-        }
+    geometry = {
+        'grid_size': ve_grid.cells,
+        'size': ve_grid.size,
+        'origin': ve_grid.origin,
+        'element_material_idx': ve_grid.material,
+        'meta': {
+            'comments': ve_grid.comments,
+        },
+    }
 
     return geometry
 
@@ -377,16 +271,25 @@ def read_spectral_stderr(path):
         return errors
 
 
-def read_HDF5_file(hdf5_path, incremental_data, operations=None):
+def read_HDF5_file(
+    hdf5_path,
+    geom_path=None,
+    incremental_data=None,
+    volume_data=None,
+    phase_data=None,
+    field_data=None,
+    grain_data=None,
+    operations=None
+):
     """Operate on and extract data from an HDF5 file generated by a DAMASK run.
 
     Parameters
     ----------
     hdf5_path : Path or str
         Path to the HDF5 file.
-    incremental_data : list of dict
-        List of incremental data to extract from the HDF5 file. This is a list of dicts
-        with the following keys:
+    incremental_data : list of dict, optional
+        (Deprecated) List of incremental data to extract from the HDF5 file.
+        This is a list of dicts with the following keys:
             name: str
                 The name by which the quantity will be stored in the output dict.
             path: str
@@ -397,6 +300,100 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
                         If specified, take the sum the array along this axis.
                     mean_along_axes: int, optional
                         If specified, take the mean average of the array along this axis.
+            increments : int
+                Step size
+    volume_data : list of dict, optional
+        List of data to extract from the entire volume. This is a list of dict
+        with following keys:
+            field_name: str
+                Name of the data field to extract
+            increments: list of dict, optional
+                List of increment specifications to extract data from. Values
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
+                    values: list of int
+                        List of incremnts to extract
+                    ----OR----
+                    start: int
+                        First increment to extract
+                    stop: int
+                        Final incremnt to extract (inclusive)
+                    step: int
+                        Step between increments to extract
+            out_name: str, optional
+                Name of the data
+            transforms: list of dict, optional
+                If specified this is a list of dicts, each with the following keys:
+                    sum_along_axes : int, optional
+                        If specified, take the sum the array along this axis.
+                    mean_along_axes: int, optional
+                        If specified, take the mean average of the array along this axis.
+    phase_data : list of dict, optional
+        List of data to extract from a single phase. This is a list of dict
+        with following keys:
+            field_name: str
+                Name of the data field to extract
+            phase_name : str
+                Name of phase to
+            increments: list of dict, optional
+                List of increment specifications to extract data from. Values
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
+                    values: list of int
+                        List of incremnts to extract
+                    ----OR----
+                    start: int
+                        First increment to extract
+                    stop: int
+                        Final incremnt to extract (inclusive)
+                    step: int
+                        Step between increments to extract
+            out_name: str, optional
+                Name of the data
+            transforms: list of dict, optional
+                If specified this is a list of dicts, each with the following keys:
+                    sum_along_axes : int, optional
+                        If specified, take the sum the array along this axis.
+                    mean_along_axes: int, optional
+                        If specified, take the mean average of the array along this axis.
+    field_data : list of dict, optional
+        List of field data to extract. Only extracts for the first constituent
+        of each material point. This is a list of dict with following keys:
+            field_name: str
+                Name of the data field to extract
+            increments: list of dict, optional
+                List of increment specifications to extract data from. Values
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
+                    values: list of int
+                        List of incremnts to extract
+                    ----OR----
+                    start: int
+                        First increment to extract
+                    stop: int
+                        Final incremnt to extract (inclusive)
+                    step: int
+                        Step between increments to extract
+        Special field_name keys exist, 'grain' and 'phase'. Use 'u_n' or 'u_p'
+        for displacement.
+    grain_data : list of dict, optional
+        List of grain data to extract. Only extracts for the first constituent
+        of each material point. This is a list of dict with following keys:
+            field_name: str
+                Name of the data field to extract
+            increments: list of dict, optional
+                List of increment specifications to extract data from. Values
+                refer to increments in the simulation. Default to all. This is
+                a list of dict one of the following sets of keys:
+                    values: list of int
+                        List of incremnts to extract
+                    ----OR----
+                    start: int
+                        First increment to extract
+                    stop: int
+                        Final incremnt to extract (inclusive)
+                    step: int
+                        Step between increments to extract
     operations : list of dict, optional
         List of methods to invoke on the DADF5 object. This is a list of dicts with the
         following keys:
@@ -405,22 +402,29 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
             args : dict
                 Parameter names and their values to pass to the DADF5 method. This
                 assumes all DADF5 method parameters are of positional-or-keyword type.
-            opts : dict
+            opts : dict, optional
                 Additional options.
 
     Returns
     -------
     volume_element_response : dict
-        Dict with keys determined by the `incremental_data` list.
+        Dict with keys determined by the `incremental_data` list and `field_data` dict.
 
     """
+    if not geom_path:
+        geom_path = Path(hdf5_path).parent / 'geom.vtr'
 
-    try:
+    # Open DAMASK output file if required
+    if operations or volume_data or phase_data or field_data or grain_data:
         from damask import Result
         sim_data = Result(hdf5_path)
-    except ImportError:
-        from damask import DADF5
-        sim_data = DADF5(hdf5_path)
+
+    # Load in grain mapping if required
+    if grain_data or (field_data and (
+            'grain' in (spec['field_name'] for spec in field_data))):
+        from damask import Grid
+        ve = Grid.load(geom_path)
+        grains = ve.material
 
     for op in operations or []:
         func = getattr(sim_data, op['name'], None)
@@ -430,14 +434,14 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
             func(**op['args'])
 
         # Deal with specific options:
-        if op['opts'].get('add_Mises', {}):
+        if op.get('opts', {}).get('add_Mises', {}):
 
-            if op["name"] == 'add_Cauchy':
-                label = f'sigma'
+            if op["name"] == 'add_stress_Cauchy':
+                label = 'sigma'
 
-            elif op["name"] == 'add_strain_tensor':
+            elif op["name"] == 'add_strain':
                 # Include defaults from `DADF5.add_strain_tensor`:
-                t = op['args'].get('t', 'U')
+                t = op['args'].get('t', 'V')
                 m = op['args'].get('m', 0)
                 F = op['args'].get('F', 'F')
                 label = f'epsilon_{t}^{m}({F})'
@@ -447,26 +451,179 @@ def read_HDF5_file(hdf5_path, incremental_data, operations=None):
                        f'"add_Mises".')
                 raise ValueError(msg)
 
-            sim_data.add_Mises(label)
+            sim_data.add_equivalent_Mises(label)
 
-    volume_element_response = {}
-    for inc_dat_spec in incremental_data:
+    incremental_response = {}
+    for spec in incremental_data or []:
         inc_dat = get_HDF5_incremental_quantity(
             hdf5_path=hdf5_path,
-            dat_path=inc_dat_spec['path'],
-            transforms=inc_dat_spec.get('transforms'),
-            increments=inc_dat_spec.get('increments', 1),
+            dat_path=spec['path'],
+            transforms=spec.get('transforms'),
+            increments=spec.get('increments', 1),
         )
-        volume_element_response.update({
-            inc_dat_spec['name']: {
+        incremental_response.update({
+            spec['name']: {
                 'data': inc_dat,
                 'meta': {
-                    'path': inc_dat_spec['path'],
-                    'transforms': inc_dat_spec.get('transforms'),
-                    'increments': inc_dat_spec.get('increments', 1),
+                    'path': spec['path'],
+                    'transforms': spec.get('transforms'),
+                    'increments': spec.get('increments', 1),
                 },
             }
         })
+
+    volume_response = {}
+    for spec in volume_data or []:
+        field_name = spec['field_name']
+        out_name = spec.get('out_name')
+        transforms = spec.get('transforms')
+
+        vol_dat, increments, phase_names = get_vol_data(
+            sim_data, field_name, spec.get('increments'), transforms=transforms
+        )
+        # No increments returned, continue to next
+        if not increments:
+            continue
+
+        # Get out_name or construct out_name
+        if out_name is None or out_name in volume_response:
+            if out_name in volume_response:
+                print(f'`out_name` "{out_name}" already exists. Generating a new name.')
+            out_name = [field_name]
+            out_name += [f'{op}_{axis}' for t in transforms or []
+                         for op, axis in t.items()]
+            out_name = '_'.join(out_name)
+
+        volume_response.update({
+            out_name: {
+                'data': vol_dat,
+                'meta': {
+                    'field_name': field_name,
+                    'phase_names': phase_names,
+                    'increments': increments,
+                    'transforms': transforms,
+                }
+            }
+        })
+
+    phase_response = {}
+    for spec in phase_data or []:
+        field_name = spec['field_name']
+        phase_name = spec['phase_name']
+        out_name = spec.get('out_name')
+        transforms = spec.get('transforms')
+
+        phase_dat, increments = get_phase_data(
+            sim_data, field_name, phase_name, spec.get('increments'),
+            transforms=transforms
+        )
+        # No increments returned, continue to next
+        if not increments:
+            continue
+
+        # Get out_name or construct out_name
+        if out_name is None or out_name in phase_response:
+            if out_name in phase_response:
+                print(f'`out_name` "{out_name}" already exists. Generating a new name.')
+            out_name = [field_name, phase_name]
+            out_name += [f'{op}_{axis}' for t in transforms or []
+                         for op, axis in t.items()]
+            out_name = '_'.join(out_name)
+
+        phase_response.update({
+            out_name: {
+                'data': phase_dat,
+                'meta': {
+                    'field_name': field_name,
+                    'phase_name': phase_name,
+                    'increments': increments,
+                    'transforms': transforms,
+                }
+            }
+        })
+
+    field_response = {}
+    for spec in field_data or []:
+        field_name = spec['field_name']
+
+        if field_name == 'phase':
+            at_cell_ph, _, _, _ = sim_data._mappings()
+            phase_mapping = np.empty(sim_data.N_materialpoints, dtype=np.uint8)
+            phase_names = []
+
+            for i, (phase_name, mask) in enumerate(at_cell_ph[0].items()):
+                phase_mapping[mask] = i
+                phase_names.append(phase_name)
+
+            field_dat = reshape_field_data(phase_mapping,
+                                           tuple(sim_data.cells))
+            field_meta = {
+                'phase_names': phase_names,
+                'num_phases': len(np.unique(phase_mapping)),
+            }
+
+        elif field_name == 'grain':
+            field_dat = grains
+            field_meta = {'num_grains': len(np.unique(grains))}
+
+        else:
+            field_dat, increments = get_field_data(
+                sim_data, field_name, spec.get('increments')
+            )
+            # No increments returned, continue to next
+            if not increments:
+                continue
+            field_meta = {'increments': increments}
+
+        field_response.update({
+            field_name: {
+                'data': field_dat,
+                'meta': field_meta
+            }
+        })
+
+    grain_response = {}
+    for spec in grain_data or []:
+        field_name = spec['field_name']
+
+        # check if identical field data already exists
+        if spec in (field_data or []):
+            try:
+                field_dat = field_response[field_name]
+            except KeyError:
+                # No increments returned in field response, continue to next
+                continue
+            increments = field_dat['meta']['increments']
+            field_dat = field_dat['data']
+        # otherwise create it
+        else:
+            field_dat, increments = get_field_data(
+                sim_data, field_name, spec.get('increments')
+            )
+            # No increments returned, continue to next
+            if not increments:
+                continue
+
+        # grain average
+        is_oris = field_name == 'O'
+        grain_dat = apply_grain_average(field_dat, grains, is_oris=is_oris)
+
+        grain_response.update({
+            field_name: {
+                'data': grain_dat,
+                'meta': {
+                    'increments': increments,
+                }
+            }
+        })
+
+    volume_element_response = {
+        'incremental_data': incremental_response,
+        'volume_data': volume_response,
+        'phase_data': phase_response,
+        'field_data': field_response,
+        'grain_data': grain_response,
+    }
 
     return volume_element_response
 
@@ -558,7 +715,7 @@ def read_material(path):
     return material_data
 
 
-def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=None):
+def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations):
     """Read a DAMASK geom file and parse to a volume element.
 
     Parameters
@@ -577,15 +734,14 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
         additional list elements in `phase_labels`.
     homog_label : str, optional
         The homogenization scheme label to use for all materials in the volume element.
-    orientations : dict, optional
-        If specified, use these orientations instead of those that might be specified in
-        the geometry file. Dict containing the following keys:
+    orientations : dict
+        Dict containing the following keys:
             type : str
                 One of "euler", "quat".
             quaternions : (list or ndarray of shape (R, 4)) of float, optional
                 Array of R row four-vectors of unit quaternions. Specify either
                 `quaternions` or `euler_angles`.
-            euler_angles : (list or ndarray of shape (R, 3)) of float, optional            
+            euler_angles : (list or ndarray of shape (R, 3)) of float, optional
                 Array of R row three-vectors of Euler angles. Specify either `quaternions`
                 or `euler_angles`. Specified as proper Euler angles in the Bunge
                 convention (rotations are about Z, new-X, new-new-Z).
@@ -594,7 +750,7 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
             unit_cell_alignment : dict
                 Alignment of the unit cell.
             P : int, optional
-                The "P" constant, either +1 or -1, as defined within [1].                
+                The "P" constant, either +1 or -1, as defined within [1].
 
     Returns
     -------
@@ -612,10 +768,11 @@ def geom_to_volume_element(geom_path, phase_labels, homog_label, orientations=No
 
     geom_dat = read_geom(geom_path)
     volume_element = {
-        'orientations': orientations or geom_dat['orientations'],
+        'orientations': orientations,
         'element_material_idx': geom_dat['element_material_idx'],
         'grid_size': geom_dat['grid_size'],
         'size': geom_dat['size'],
+        'origin': geom_dat['origin'],
         'phase_labels': phase_labels,
         'homog_label': homog_label,
     }

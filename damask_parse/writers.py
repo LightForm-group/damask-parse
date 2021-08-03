@@ -25,93 +25,96 @@ __all__ = [
 ]
 
 
-def write_geom(volume_element, geom_path):
+def write_geom(dir_path, volume_element, name='geom.vtr'):
     """Write the geometry file for a spectral DAMASK simulation.
 
     Parameters
     ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
     volume_element : dict
         Dict that represents the specification of a volume element, with keys:
             element_material_idx : ndarray of shape equal to `grid_size` of int, optional
-                Determines the material to which each geometric model element belongs,
-                where P is the number of elements.
+                Determines the material to which each geometric model
+                element belongs, where P is the number of elements.
             grid_size : ndarray of shape (3,) of int, optional
                 Geometric model grid dimensions.
             size : list of length three, optional
                 Volume element size. By default set to unit size: [1.0, 1.0, 1.0].
             origin : list of length three, optional
                 Volume element origin. By default: [0, 0, 0].
-    geom_path : str or Path
-        The path to the file that will be generated.
+    name : str, optional
+        Name of geometry file to write. By default, set to "geom.vtr".
 
     Returns
     -------
     geom_path : Path
-        The path to the generated file.
+        File path to the generated geometry file.
 
     Notes
     -----
-    The microstructure and texture parts are not included in the header of the generated
-    file.
+    The microstructure and texture parts are not included in the header
+    of the generated file.
 
     """
+    from damask import Grid
 
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
+    ve_size = volume_element.get('size')
+    ve_origin = volume_element.get('origin')
+    if ve_size is None:
+        ve_size = [1.0, 1.0, 1.0]
+    if ve_origin is None:
+        ve_origin = [0.0, 0.0, 0.0]
 
-    grid_size = element_material_idx.shape
-    ve_size = volume_element.get('size') or [1.0, 1.0, 1.0]
-    ve_origin = volume_element.get('origin') or [0.0, 0.0, 0.0]
-    num_micros = np.max(element_material_idx) + 1  # element_material_idx is zero-indexed
+    dir_path = Path(dir_path).resolve()
+    geom_path = dir_path.joinpath(name)
 
-    header_lns = [
-        f'grid a {grid_size[0]} b {grid_size[1]} c {grid_size[2]}',
-        f'size x {ve_size[0]} y {ve_size[1]} z {ve_size[2]}',
-        f'origin x {ve_origin[0]} y {ve_origin[1]} z {ve_origin[2]}',
-        f'microstructures {num_micros}',
-        f'homogenization 1',
-    ]
-    num_header_lns = len(header_lns)
-    header = f'{num_header_lns} header\n' + '\n'.join(header_lns) + '\n'
-
-    elem_mat_idx_2D = np.concatenate(element_material_idx.swapaxes(0, 2))
-    elem_mat_idx_2D += 1  # one-indexed
-
-    arr_str = ''
-    for row in elem_mat_idx_2D:
-        for col in row:
-            arr_str += '{:<5d}'.format(col)
-        arr_str += '\n'
-
-    geom_path = Path(geom_path)
-    with geom_path.open('w') as handle:
-        handle.write(header + arr_str)
+    ve_grid = Grid(material=element_material_idx, size=ve_size,
+                   origin=ve_origin)
+    ve_grid.save(geom_path)
 
     return geom_path
 
 
-def write_load_case(load_path, load_cases):
+def write_load_case(dir_path, load_cases, name='load.yaml'):
+    """Write the load file for a DAMASK simulation.
+
+    Parameters
+    ----------
+    dir_path : str or Path
+        Directory in which to generate the file(s).
+    load_cases : list of dict
+
+    name : str, optional
+        Name of the load file to write. By default, set to "load.yaml".
+
+    Returns
+    -------
+    load_path : Path
+        File path to the generated load file.
+
     """
+    from damask import Rotation
 
-    Example load case line is: 
-        fdot 1.0e-3 0 0  0 * 0  0 0 * stress * * *  * 0 *   * * 0  time 10  incs 40
-
-    """
-
-    all_load_case = []
+    load_steps = []
 
     for load_case in load_cases:
 
         def_grad_aim = load_case.get('def_grad_aim')
         def_grad_rate = load_case.get('def_grad_rate')
+        vel_grad = load_case.get('vel_grad')
         stress = load_case.get('stress')
         rot = load_case.get('rotation_matrix')
         total_time = load_case['total_time']
         num_increments = load_case['num_increments']
         freq = load_case.get('dump_frequency', 1)
 
-        if def_grad_aim is not None and def_grad_rate is not None:
-            msg = 'Specify only one of `def_grad_rate` and `def_grad_aim`.'
+        if sum((x is not None
+                for x in (def_grad_aim, def_grad_rate, vel_grad))) > 1:
+            msg = ('Specify only one of `def_grad_rate`,  `def_grad_aim` '
+                   'and `vel_grad`.')
             raise ValueError(msg)
 
         stress_symbol = 'P'
@@ -126,7 +129,10 @@ def write_load_case(load_path, load_cases):
             dg_arr_sym = 'F'
         elif def_grad_rate is not None:
             dg_arr = def_grad_rate
-            dg_arr_sym = 'Fdot'
+            dg_arr_sym = 'dot_F'
+        elif vel_grad is not None:
+            dg_arr = vel_grad
+            dg_arr_sym = 'L'
 
         if isinstance(dg_arr, list):
             if isinstance(dg_arr[0], list):
@@ -138,62 +144,61 @@ def write_load_case(load_path, load_cases):
                 stress = [j for i in stress for j in i]  # flatten
             stress = masked_array_from_list(stress, fill_value='*').reshape((3, 3))
 
-        load_case_ln = []
+        load_step = {
+            'boundary_conditions': {
+                'mechanical': {}
+            }
+        }
+        bc_mech = load_step['boundary_conditions']['mechanical']
 
         if stress is None:
 
             if dg_arr is None:
-                msg = 'Specify one of `def_grad_rate` or `def_grad_aim.'
+                msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
+                       '`vel_grad`.')
                 raise ValueError(msg)
 
             if isinstance(dg_arr, np.ma.core.MaskedArray):
-                msg = ('To use mixed boundary conditions, `stress` must be passed as a '
-                       'masked array.')
+                msg = ('To use mixed boundary conditions, `stress` must be '
+                       'passed as a masked array.')
                 raise ValueError(msg)
 
-            dg_arr_fmt = format_1D_masked_array(dg_arr.flatten())
-            load_case_ln.append(dg_arr_sym + ' ' + dg_arr_fmt)
+            bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
 
         else:
             if isinstance(stress, np.ma.core.MaskedArray):
 
                 if dg_arr is None:
-                    msg = 'Specify one of `def_grad_rate` or `def_grad_aim.'
+                    msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
+                           '`vel_grad`.')
                     raise ValueError(msg)
 
-                msg = ('`def_grad_rate` or `def_grad_aim` must be component-wise exclusive '
-                       'with `stress` (both as masked arrays)')
+                msg = ('`def_grad_rate`, `def_grad_aim` or `vel_grad` must be '
+                       'component-wise exclusive with `stress` (both as '
+                       'masked arrays)')
                 if not isinstance(dg_arr, np.ma.core.MaskedArray):
                     raise ValueError(msg)
                 if np.any(dg_arr.mask == stress.mask):
                     raise ValueError(msg)
 
-                dg_arr_fmt = format_1D_masked_array(
-                    dg_arr.flatten(), fill_symbol='*')
-                stress_arr_fmt = format_1D_masked_array(
-                    stress.flatten(), fill_symbol='*')
-                load_case_ln.extend([
-                    dg_arr_sym + ' ' + dg_arr_fmt,
-                    stress_symbol + ' ' + stress_arr_fmt,
-                ])
+                if dg_arr_sym == 'L':
+                    if any((sum(row) not in (0, 3) for row in dg_arr.mask)):
+                        msg = ('Specify all or no values for each row of '
+                               '`vel_grad`')
+                        raise ValueError(msg)
+
+                bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
+                bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
 
             else:
                 if dg_arr is not None:
-                    msg = ('To use mixed boundary conditions, `stress` must be passed as a '
-                           'masked array.')
+                    msg = ('To use mixed boundary conditions, `stress` must '
+                           'be passed as a masked array.')
                     raise ValueError(msg)
 
-                stress_arr_fmt = format_1D_masked_array(stress.flatten())
-                load_case_ln.append(stress_symbol + ' ' + stress_arr_fmt)
-
-        load_case_ln.extend([
-            f't {total_time}',
-            f'incs {num_increments}',
-            f'freq {freq}',
-        ])
+                bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
 
         if rot is not None:
-
             rot = np.array(rot)
             msg = 'Matrix passed as a rotation is not a rotation matrix.'
             if not np.allclose(rot.T @ rot, np.eye(3)):
@@ -201,17 +206,30 @@ def write_load_case(load_path, load_cases):
             if not np.isclose(np.linalg.det(rot), 1):
                 raise ValueError(msg)
 
-            rot_fmt = format_1D_masked_array(rot.flatten())
-            load_case_ln.append(f'rot {rot_fmt}')
+            rot = Rotation._om2ax(rot)
+            rot[3] *= 180 / np.pi
 
-        load_case_str = ' '.join(load_case_ln)
-        all_load_case.append(load_case_str)
+            bc_mech['R'] = rot.tolist()
 
-    all_load_case_str = '\n'.join(all_load_case)
+        load_step['discretization'] = {
+            't': total_time,
+            'N': num_increments,
+        }
+        load_step['f_out'] = freq
 
-    load_path = Path(load_path)
-    with load_path.open('w') as handle:
-        handle.write(all_load_case_str)
+        load_steps.append(load_step)
+
+    load_data = {
+        'solver': {
+            'mechanical': 'spectral_basic'
+        },
+        'loadstep': load_steps
+    }
+
+    dir_path = Path(dir_path).resolve()
+    load_path = dir_path.joinpath(name)
+    yaml = YAML()
+    yaml.dump(load_data, load_path)
 
     return load_path
 
@@ -238,7 +256,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
                     quaternions : ndarray of shape (R, 4) of float, optional
                         Array of R row four-vectors of unit quaternions. Specify either
                         `quaternions` or `euler_angles`.
-                    euler_angles : ndarray of shape (R, 3) of float, optional            
+                    euler_angles : ndarray of shape (R, 3) of float, optional
                         Array of R row three-vectors of Euler angles in degrees or radians,
                         as determined by `euler_degrees`. Specify either `quaternions` or
                         `euler_angles`. Specified as proper Euler angles in the Bunge
@@ -308,7 +326,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
       under some homogenization scheme. For a full-field simulation, there will be only
       one constituent per "material" (and no associated homogenization).
 
-    - The input `volume_element` can be either fully specified with respect to the 
+    - The input `volume_element` can be either fully specified with respect to the
       `constituent_*` keys or, if no `constituent_*` keys are specified, but the
       `element_material_idx` and `grid_size` keys are specified, we assume the model to be
       a full-field model for which each material contains precisely one constituent. In
@@ -319,7 +337,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
 
     """
 
-    microstructures = get_volume_element_materials(
+    materials = get_volume_element_materials(
         volume_element,
         homog_schemes=homog_schemes,
         phases=phases,
@@ -328,7 +346,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     mat_dat = {
         'phase': phases,
         'homogenization': homog_schemes,
-        'microstructure': microstructures,
+        'material': materials,
     }
     mat_data_fmt = prepare_material_yaml_data(mat_dat)  # e.g. format quats to 15 d.p.
 
@@ -350,7 +368,7 @@ def write_numerics(dir_path, numerics, name='numerics.yaml'):
     numerics : dict
         Dict of key-value pairs to write into the file.
     name : str, optional
-        Name of numerics file to write. By default, set to "numerics.yaml".        
+        Name of numerics file to write. By default, set to "numerics.yaml".
 
     Returns
     -------
