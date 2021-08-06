@@ -1450,7 +1450,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
 
             mat_i_const_j = {
                 'v': float(const_mat_frac[const_idx]),
-                'O': mat_i_const_j_ori.tolist(),  # list of np.float64 or np.float128
+                'O': mat_i_const_j_ori.tolist(),  # list of native float or np.longdouble
                 'phase': mat_i_const_j_phase,
             }
             mat_i_constituents.append(mat_i_const_j)
@@ -1499,7 +1499,10 @@ def prepare_material_yaml_data(mat_dat):
 
     # Write out quaternions to maximum precision of the dtype:
     first_ori = mat_dat['material'][0]['constituents'][0]['O'][0]
-    ORI_NUM_DP = np.finfo(first_ori.dtype).precision
+    if isinstance(first_ori, np.floating):
+        ORI_NUM_DP = np.finfo(first_ori.dtype).precision
+    else:
+        ORI_NUM_DP = 15  # precision of native float, roughly...
 
     mat_dat_fmt = copy.deepcopy(mat_dat)
 
