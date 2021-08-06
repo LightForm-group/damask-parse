@@ -713,7 +713,7 @@ def get_vol_data(sim_data, field_name, increments, transforms=None):
             first_inc = False
 
         if isinstance(data, dict):
-            data = np.vstack([dat for dat in data.values()])
+            data = np.concatenate([dat for dat in data.values()], axis=0)
         elif not isinstance(data, np.ndarray):
             continue   # something isn't right, move to next
 

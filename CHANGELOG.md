@@ -21,6 +21,7 @@ All use a consistent definition of the increments to extract from, based on the 
 
 - In `utils.validate_orientations`, cast quaternions to an array of type `np.longdouble` prior to normalisation, and then write out these quaternions (in `writers.write_material` via a new function `utils.prepare_material_yaml_data`) to the largest precision supported by `np.longdouble` on that machine, to ensure maximum precision, and hopefully avoid the DAMASK error: "invalid orientation specified".
 - Fix issue where `write_geom` would raise if volume element `size` or `origin` is an array rather than a list.
+- Fix issue [#15](https://github.com/LightForm-group/damask-parse/issues/15)
 
 ## [0.2.10] - 2021.01.25
 
