@@ -966,10 +966,16 @@ def validate_orientations(orientations):
               f'within `np.longdouble` resolution ({res}); they will be normalised.')
         quaternions[to_norm] = quaternions[to_norm] / norm_factor[to_norm, None]
 
+    if not orientations.get('use_max_precision'):
+        # Cast back to np.float64 (supported on "all" systems), unless requested to keep
+        # highest precision:
+        quaternions = quaternions.astype(np.float64)
+
     orientations_valid = {
         'type': 'quat',
         'quaternions': quaternions,
         'unit_cell_alignment': alignment,
+        'use_max_precision': orientations.get('use_max_precision', False),
         'P': P,
     }
 
@@ -1444,7 +1450,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
 
             mat_i_const_j = {
                 'v': float(const_mat_frac[const_idx]),
-                'O': mat_i_const_j_ori.tolist(),
+                'O': mat_i_const_j_ori.tolist(),  # list of np.float64 or np.float128
                 'phase': mat_i_const_j_phase,
             }
             mat_i_constituents.append(mat_i_const_j)
@@ -1491,9 +1497,9 @@ def prepare_material_yaml_data(mat_dat):
 
     """
 
-    # Quaternions are stored as np.longdouble, so write out to maximum available (system-
-    # dependent) precision:
-    ORI_NUM_DP = np.finfo(np.longdouble).precision
+    # Write out quaternions to maximum precision of the dtype:
+    first_ori = mat_dat['material'][0]['constituents'][0]['O'][0]
+    ORI_NUM_DP = np.finfo(first_ori.dtype).precision
 
     mat_dat_fmt = copy.deepcopy(mat_dat)
 
