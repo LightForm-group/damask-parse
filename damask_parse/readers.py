@@ -686,15 +686,20 @@ def read_material(path):
     orientations = {
         'type': 'quat',
         'quaternions': [],
+        'unit_cell_alignment': {
+            'x': 'a',
+            'z': 'c',
+        },
+        'P': -1,
     }
 
-    for mat_idx, material in enumerate(material_dat['microstructure']):
+    for mat_idx, material in enumerate(material_dat['material']):
         material_homog.append(material['homogenization'])
         for const in material['constituents']:
             const_material_idx.append(mat_idx)
-            const_material_fraction.append(const['fraction'])
+            const_material_fraction.append(const['v'])
             const_phase_label.append(const['phase'])
-            orientations['quaternions'].append(const['orientation'])
+            orientations['quaternions'].append(const['O'])
             const_orientation_idx.append(len(const_orientation_idx))
 
     vol_elem = {

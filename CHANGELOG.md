@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.12] - 2021.xx.xx
+
+### Fixed
+
+- Fix `read_material` for new geometry format.
+
 ## [0.2.11] - 2021.08.06
 
 ### Added
