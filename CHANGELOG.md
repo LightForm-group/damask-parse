@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.13] - 2021.xx.xx
+
+### Changed
+
+- Only include in the `material.yaml` file the phase definitions of used phases.
+
 ## [0.2.12] - 2021.08.12
 
 ### Fixed
