@@ -345,6 +345,12 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
         phases=phases,
         P=-1,  # DAMASK uses P = -1 convention.
     )
+
+    # Only include phases that are used:
+    phases = {phase_name: phase_data
+              for phase_name, phase_data in phases.items()
+              if phase_name in volume_element['constituent_phase_label']}
+    
     mat_dat = {
         'phase': phases,
         'homogenization': homog_schemes,
