@@ -1370,7 +1370,7 @@ def get_constituent_material_idx(material_constituent_idx):
 
 def get_volume_element_materials(volume_element, homog_schemes=None, phases=None, P=-1):
     """Get the materials list from a volume element that can be used to populate
-    the "microstructures" list in a DAMASK materials.yaml file.
+    the "material" list in a DAMASK materials.yaml file.
 
     Parameters
     ----------
