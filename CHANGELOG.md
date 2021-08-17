@@ -5,6 +5,7 @@
 ### Changed
 
 - The orientations dict must now include a key `quat_component_ordering` if specifying quaternion orientations, with a value "scalar-vector" or "vector-scalar".
+
 ## [0.2.13] - 2021.08.14
 
 ### Changed
