@@ -5,6 +5,7 @@
 ### Changed
 
 - Only include in the `material.yaml` file the phase definitions of used phases.
+- The orientations dict must now include a key `quat_component_ordering` if specifying quaternion orientations, with a value "scalar-vector" or "vector-scalar".
 
 ## [0.2.12] - 2021.08.12
 

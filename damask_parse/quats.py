@@ -19,7 +19,8 @@ def euler2quat(euler_angles, degrees=False, P=1):
     Returns
     -------
     quats : ndarray of shape (N, 4) of float
-        Array of N row four-vectors of unit quaternions.
+        Array of N row four-vectors of unit quaternions with scalar-vector component
+        ordering.
 
     Notes
     -----

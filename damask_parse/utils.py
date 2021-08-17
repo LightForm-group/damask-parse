@@ -647,6 +647,7 @@ def process_damask_orientatons(ori_data):
         'type': 'quat',
         'quaternions': ori_data,
         'unit_cell_alignment': {'x': 'a'},
+        'quat_component_ordering': 'scalar-vector',
         'P': -1,
     }
 
@@ -867,6 +868,7 @@ def validate_orientations(orientations):
                 radians.
             unit_cell_alignment : dict
                 Alignment of the unit cell.
+            quat_component_ordering: str ("scalar-vector" or "vector-scalar")
 
     Returns
     -------
@@ -884,6 +886,8 @@ def validate_orientations(orientations):
                 The "P" constant, either +1 or -1, as defined within [1]. If included in
                 the original `orientations` dict, this value will be unchanged. Otherwise,
                 this will be set to +1.
+            quat_component_ordering: str ("scalar-vector" or "vector-scalar")
+                Value will be set to "scalar-vector".
 
     References
     ----------
@@ -899,7 +903,10 @@ def validate_orientations(orientations):
     eulers = orientations.get('euler_angles')
     euler_is_degs = orientations.get('euler_degrees')
     quats = orientations.get('quaternions')
+    quats_comp_order = orientations.get('quat_component_ordering')
     alignment = orientations.get('unit_cell_alignment')
+
+    ALLOWED_QUAT_ORDER = ['scalar-vector', 'vector-scalar']
 
     P = orientations.get('P', 1)
     if P not in [-1, 1]:
@@ -937,6 +944,7 @@ def validate_orientations(orientations):
 
         # Convert Euler angles to quaternions:
         quaternions = euler2quat(euler_angles, degrees=euler_is_degs, P=P)
+        quats_comp_order = 'scalar-vector'
 
     elif ori_type == 'quat':
         if quats is None:
@@ -954,6 +962,17 @@ def validate_orientations(orientations):
                    f'array of shape (R, 4), but shape passed was: {quaternions.shape}.')
             raise ValueError(msg)
 
+        if quats_comp_order == 'vector-scalar':
+            # "normalise" to scalar-vector convention:
+            quaternions = np.roll(quaternions, 1, axis=1)
+            quats_comp_order = 'scalar-vector'
+        
+    if quats_comp_order not in ALLOWED_QUAT_ORDER:
+        msg = (f'Quaternion component order key `quat_component_ordering` must be '
+                f'specified as either "scalar-vector" or "vector-scalar". Actual '
+                f'value was: "{quats_comp_order}".')
+        raise ValueError(msg)
+        
     # To ensure maximum precision of quaternions, cast to longdouble (although note that
     # precision is system-dependent):
     quaternions = quaternions.astype(np.longdouble)
@@ -974,6 +993,7 @@ def validate_orientations(orientations):
     orientations_valid = {
         'type': 'quat',
         'quaternions': quaternions,
+        'quat_component_ordering': quats_comp_order,
         'unit_cell_alignment': alignment,
         'use_max_precision': orientations.get('use_max_precision', False),
         'P': P,
@@ -1407,6 +1427,14 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
     mat_const_idx = get_material_constituent_idx(const_mat_idx)
 
     all_quats = volume_element['orientations']['quaternions']
+    
+    quat_comp_order = volume_element['orientations'].get('quat_component_ordering')
+    if quat_comp_order != 'scalar-vector':
+        msg = (f'Quaternion component ordering (`quat_component_ordering`) should be '
+               f'"scalar-vector", as adopted by DAMASK, but it is actually '
+               f'"{quat_comp_order}"')
+        raise RuntimeError(msg)
+
     const_mat_frac = volume_element['constituent_material_fraction']
     const_ori_idx = volume_element['constituent_orientation_idx']
     const_phase_lab = volume_element['constituent_phase_label']

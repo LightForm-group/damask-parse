@@ -686,6 +686,7 @@ def read_material(path):
     orientations = {
         'type': 'quat',
         'quaternions': [],
+        'quat_component_ordering': 'scalar-vector',
         'unit_cell_alignment': {
             'x': 'a',
             'z': 'c',
