@@ -2,6 +2,10 @@
 
 ## [0.2.14] - 2021.xx.xx
 
+### Added
+
+- Add class `particles.ParticleRVE` and function `particles.generate_particle_distribution` for generating RVEs with particles.
+
 ### Changed
 
 - The orientations dict must now include a key `quat_component_ordering` if specifying quaternion orientations, with a value "scalar-vector" or "vector-scalar".

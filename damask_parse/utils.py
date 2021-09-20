@@ -1553,3 +1553,19 @@ def prepare_material_yaml_data(mat_dat):
             const['O'] = ori_list
 
     return mat_dat_fmt
+
+def get_coordinate_grid(size, grid_size):
+    """Get the coordinates of the element centres of a uniform grid."""
+
+    grid_size = np.array(grid_size)
+    size = np.array(size)
+
+    grid = np.meshgrid(*[np.arange(i) for i in grid_size])
+    grid = np.moveaxis(np.array(grid), 0, -1)  # shape (*grid_size, dimension)
+
+    element_size = (size / grid_size).reshape(1, 1, -1)
+
+    coords = grid * size.reshape(1, 1, -1) / grid_size.reshape(1, 1, -1)
+    coords += element_size / 2
+
+    return coords, element_size
