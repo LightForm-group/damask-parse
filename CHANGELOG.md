@@ -6,6 +6,10 @@
 
 - The orientations dict must now include a key `quat_component_ordering` if specifying quaternion orientations, with a value "scalar-vector" or "vector-scalar".
 
+### Fixed 
+
+- Fix issue where `np.longdouble`-precision quaternions do not maintain that precision due to arithemtic with lower-precision data.
+
 ## [0.2.13] - 2021.08.14
 
 ### Changed

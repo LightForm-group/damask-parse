@@ -1456,8 +1456,9 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                 if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
                     # Convert from y//b to x//a:
                     hex_transform_quat = axang2quat(
-                        volume_element['orientations']['P'] * np.array([0, 0, 1]),
-                        np.pi/6
+                        volume_element['orientations']['P'] * np.array(
+                            [0, 0, 1], dtype=np.longdouble),
+                        np.longdouble(np.pi/6)
                     )
                     mat_i_const_j_ori = multiply_quaternions(
                         q1=hex_transform_quat,
