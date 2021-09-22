@@ -289,14 +289,9 @@ class ParticleRVE:
         return centre
 
     def _generate_damask_grid_obj(self):
-        from damask import seeds, Grid
-        my_seeds = seeds.from_random([1, 1, 1], 1)  # todo better way to do this?
-        grid_obj = Grid.from_Voronoi_tessellation(
-            cells=np.array(self.grid_size),
-            size=self.size,
-            seeds=my_seeds,
-            periodic=True,
-        )
+        from damask import Grid
+        material = np.zeros(self.grid_size, dtype=np.int64)
+        grid_obj = Grid(material=material, size=self.size)
         return grid_obj
 
     def _add_particle(self, particle):
