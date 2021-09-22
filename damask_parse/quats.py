@@ -127,7 +127,7 @@ def multiply_quaternions(q1, q2, P=1):
     s1, v1 = q1[0], q1[1:]
     s2, v2 = q2[0], q2[1:]
 
-    q3 = np.zeros(4)
+    q3 = np.zeros(4, dtype=np.longdouble)
     q3[0] = (s1 * s2) - np.dot(v1, v2)
     q3[1:] = (s1 * v2) + (s2 * v1) + P * np.cross(v1, v2)
 
