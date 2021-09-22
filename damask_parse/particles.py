@@ -153,6 +153,15 @@ class Particle:
                        f'{self.minor_axis_ratios}')
                 raise ValueError(msg)
 
+        if not np.isclose(np.dot(self.major_axis_dir, self.major_plane_normal_dir), 0):
+            msg = (f'`major_axis_dir` ({self.major_axis_dir}) and '
+                   f'`major_plane_normal_dir` ({self.major_plane_normal_dir}) '
+                   f'must be perpendicular.')
+            raise ValueError(msg)
+
+        self.major_axis_dir /= np.linalg.norm(self.major_axis_dir)
+        self.major_plane_normal_dir /= np.linalg.norm(self.major_plane_normal_dir)
+
     @property
     def centre(self):
         return self._centre
@@ -199,6 +208,14 @@ class Particle:
         particle = Particle.from_axis_sizes(new_axes_sizes, centre=self.centre)
         return particle
 
+    @property
+    def minor_axis_dir(self):
+        """Unit vector of the third axis direction (i.e. after `major_axis_dir` and 
+        `major_plane_normal_dir`"""
+        xprod = np.cross(self.major_plane_normal_dir, self.major_axis_dir)
+        minor_axis_dir = xprod / np.linalg.norm(xprod)
+        return minor_axis_dir
+
     def displace(self, displacement):
         self.centre += displacement
 
@@ -222,7 +239,6 @@ class ParticleRVE:
         self.grid_obj = self._generate_damask_grid_obj()
         self.particles = []
         self.random_seed = random_seed
-        # TODO need to make this seed different to particle seed?
         self.rng = np.random.default_rng(random_seed)
 
         self._add_particles(particles)
@@ -233,14 +249,7 @@ class ParticleRVE:
             if not isinstance(particle, Particle):
                 particle = Particle(**particle)
 
-            # todo: for now assume x-axis is major axis
-            if particle.major_axis_length > self.size[0]:
-                msg = (f'Major axis size of particle ({particle.major_axis_length}) must '
-                       f'be smaller than major axis size of RVE {self.size[0]}.')
-                raise ValueError(msg)
-
             new_particles.append(particle)
-
             self._add_particle(particle)
 
     @property
@@ -291,10 +300,17 @@ class ParticleRVE:
         return grid_obj
 
     def _add_particle(self, particle):
+        from damask import Rotation
+        rot_mat = np.array([
+            particle.major_axis_dir,
+            particle.minor_axis_dir,
+            particle.major_plane_normal_dir,
+        ]).T
         grid_obj = self.grid_obj.add_primitive(
             dimension=particle.axes_sizes,
             center=particle.centre,
             exponent=1,
+            R=Rotation.from_matrix(rot_mat),
         )
         self.particles.append(particle)
         self.grid_obj = grid_obj
@@ -363,18 +379,26 @@ class ParticleRVE:
     def write_VTR_particle_history(self, directory):
         """Generate a series of VTR files showing the insertion of the particles."""
 
+        from damask import Rotation
+
         base_grid = self._generate_damask_grid_obj()
         num_inserts = sum([len(particle.centre_history) for particle in self.particles])
         zero_pad_len = len(str(num_inserts))
         count = 0
         base_grid.save(f'{directory}/particle_RVE_{count:0{zero_pad_len}}.vtr')
         for particle in self.particles:
+            rot_mat = np.array([
+                particle.major_axis_dir,
+                particle.minor_axis_dir,
+                particle.major_plane_normal_dir,
+            ]).T
             for historic_centre in particle.centre_history:
                 count += 1
                 grid = base_grid.add_primitive(
                     dimension=particle.axes_sizes,
                     center=historic_centre,
                     exponent=1,
+                    R=Rotation.from_matrix(rot_mat),
                 )
                 grid.save(f'{directory}/particle_RVE_{count:0{zero_pad_len}}.vtr')
             base_grid = grid
