@@ -183,11 +183,19 @@ class Particle:
         )
 
     @property
-    def axes_sizes(self):
+    def diameters(self):
         return tuple([self.major_axis_length] + list(self.minor_axes_lengths))
 
+    @property
+    def radii(self):
+        return [i/2 for i in self.diameters]
+
+    @property
+    def volume(self):
+        return (4/3) * np.pi * np.product(self.radii)
+
     @classmethod
-    def from_axis_sizes(cls, axis_sizes, centre, margins=None):
+    def from_diameters(cls, axis_sizes, centre, margins=None):
         maj_ax_len = axis_sizes[0]
         min_ax_ratios = [
             axis_sizes[1] / maj_ax_len,
@@ -204,8 +212,8 @@ class Particle:
     @property
     def margined_particle(self):
         """Get the expanded particle, including margins."""
-        new_axes_sizes = [i + j for i, j in zip(self.axes_sizes, self.margins)]
-        particle = Particle.from_axis_sizes(new_axes_sizes, centre=self.centre)
+        new_diams = [i + j for i, j in zip(self.diameters, self.margins)]
+        particle = Particle.from_diameters(new_diams, centre=self.centre)
         return particle
 
     @property
@@ -256,6 +264,26 @@ class ParticleRVE:
     def material(self):
         return self.grid_obj.material
 
+    @property
+    def num_voxels(self):
+        return np.product(self.grid_size)
+
+    @property
+    def volume(self):
+        return np.product(self.size)
+
+    @property
+    def particle_voxel_volume_fraction(self):
+        """Volume fraction based on voxel assignment."""
+        matrix_vol_frac = np.sum(self.material == 0) / self.num_voxels
+        return 1 - matrix_vol_frac
+
+    @property
+    def particle_volume_fraction(self):
+        """Volume fraction for infinite grid size."""
+        particle_vols = np.sum([i.volume for i in self.particles])
+        return particle_vols / self.volume
+
     @classmethod
     def from_particle_distribution(cls, size, grid_size, number, major_axis_length,
                                    minor_axis_ratios=None, major_axis_dir=None,
@@ -302,7 +330,7 @@ class ParticleRVE:
             particle.major_plane_normal_dir,
         ]).T
         grid_obj = self.grid_obj.add_primitive(
-            dimension=particle.axes_sizes,
+            dimension=particle.diameters,
             center=particle.centre,
             exponent=1,
             R=Rotation.from_matrix(rot_mat),
@@ -390,7 +418,7 @@ class ParticleRVE:
             for historic_centre in particle.centre_history:
                 count += 1
                 grid = base_grid.add_primitive(
-                    dimension=particle.axes_sizes,
+                    dimension=particle.diameters,
                     center=historic_centre,
                     exponent=1,
                     R=Rotation.from_matrix(rot_mat),
