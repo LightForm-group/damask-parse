@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.15] - 2021.xx.xx
+
+### Changed
+
+- Add class `particles.ParticleDistribution`, and allow multiple distributions to be added to a `particles.ParticleRVE`.
+
 ## [0.2.14] - 2021.09.24
 
 ### Added
