@@ -1,3 +1,9 @@
+"""
+TODO: 
+    - Rethink to/from_JSON_like
+    - Ensure we can reproduce the same RVE with random_seed specification
+"""
+
 import copy
 
 import numpy as np
@@ -165,6 +171,7 @@ class Particle:
 
     @classmethod
     def from_JSON_like(cls, dct, distribution=None):
+        dct = copy.deepcopy(dct)
         return cls(**dct, distribution=distribution)
 
     def _validate(self):
@@ -308,6 +315,7 @@ class ParticleDistribution:
 
     @classmethod
     def from_JSON_like(cls, dct):
+        dct = copy.deepcopy(dct)
         particles = [Particle.from_JSON_like(i) for i in dct.pop('_particles', [])]
         obj = cls(_particles=particles, **dct)
         for particle in obj.particles:
@@ -431,7 +439,7 @@ class ParticleRVE:
         self.matrix_material_IDs = list(np.unique(self._material))
         self.particle_material_IDs = {None: []}  # keyed by particle distribution label
 
-        self.random_seed = random_seed
+        self.random_seed = random_seed or np.random.randint(0, 100_000)
         self.rng = np.random.default_rng(random_seed)
 
         self._add_particles(particles)
@@ -452,6 +460,7 @@ class ParticleRVE:
 
     @classmethod
     def from_JSON_like(cls, dct):
+        dct = copy.deepcopy(dct)
         particles = [Particle.from_JSON_like(i) for i in dct['particles']]
         particle_distributions = [
             ParticleDistribution.from_JSON_like(i)
@@ -679,7 +688,6 @@ class ParticleRVE:
             overlap_fraction = np.sum(overlap_bool) / np.sum(single_particle_RVE_voxels)
             count = 0
             while np.any(overlap_bool):
-                print(f'count: {count}')
                 if count > max_iter:
                     print(f'Cannot find suitable position for particle in {max_iter} '
                           f'iterations. Skipping.')
