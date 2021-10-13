@@ -8,6 +8,8 @@ import copy
 
 import numpy as np
 
+from damask_parse.utils import perpendicular_vectors
+
 
 from damask_parse.utils import get_coordinate_grid
 
@@ -274,10 +276,20 @@ class ParticleDistribution:
             minor_axis_ratios = [1, 1]  # sphere
         if margins is None:
             margins = [0, 0, 0]
-        if major_axis_dir is None:
-            major_axis_dir = [1, 0, 0]
-        if major_plane_normal_dir is None:
-            major_plane_normal_dir = [0, 0, 1]
+
+        if major_axis_dir is None and major_plane_normal_dir is not None:
+            # find perpendicular major_axis_dir
+            major_plane_normal_dir = np.array(major_plane_normal_dir, dtype=float)
+            major_axis_dir = perpendicular_vectors(major_plane_normal_dir)
+        elif major_axis_dir is not None and major_plane_normal_dir is None:
+            # find perpendicular major_plane_normal_dir
+            major_axis_dir = np.array(major_axis_dir, dtype=float)
+            major_plane_normal_dir = perpendicular_vectors(major_axis_dir)
+        else:
+            if major_axis_dir is None:
+                major_axis_dir = [1, 0, 0]
+            if major_plane_normal_dir is None:
+                major_plane_normal_dir = [0, 0, 1]
 
         self.label = label
         self.number = number
