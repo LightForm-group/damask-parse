@@ -966,13 +966,13 @@ def validate_orientations(orientations):
             # "normalise" to scalar-vector convention:
             quaternions = np.roll(quaternions, 1, axis=1)
             quats_comp_order = 'scalar-vector'
-        
+
     if quats_comp_order not in ALLOWED_QUAT_ORDER:
         msg = (f'Quaternion component order key `quat_component_ordering` must be '
-                f'specified as either "scalar-vector" or "vector-scalar". Actual '
-                f'value was: "{quats_comp_order}".')
+               f'specified as either "scalar-vector" or "vector-scalar". Actual '
+               f'value was: "{quats_comp_order}".')
         raise ValueError(msg)
-        
+
     # To ensure maximum precision of quaternions, cast to longdouble (although note that
     # precision is system-dependent):
     quaternions = quaternions.astype(np.longdouble)
@@ -1427,7 +1427,7 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
     mat_const_idx = get_material_constituent_idx(const_mat_idx)
 
     all_quats = volume_element['orientations']['quaternions']
-    
+
     quat_comp_order = volume_element['orientations'].get('quat_component_ordering')
     if quat_comp_order != 'scalar-vector':
         msg = (f'Quaternion component ordering (`quat_component_ordering`) should be '
