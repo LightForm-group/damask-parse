@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.16] - 2021.xx.xx
+
+### Changed
+
+- Update `ParticleDistribution` so a perpendicular vector is calculated for either of `major_axis_direction` or `major_plane_normal_direction` if only one of these is specified.
+
 ## [0.2.15] - 2021.10.05
 
 ### Changed
