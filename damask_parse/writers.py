@@ -106,6 +106,7 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
         def_grad_rate = load_case.get('def_grad_rate')
         vel_grad = load_case.get('vel_grad')
         stress = load_case.get('stress')
+        stress_rate = load_case.get('stress_rate')
         rot = load_case.get('rotation_matrix')
         total_time = load_case['total_time']
         num_increments = load_case['num_increments']
@@ -116,8 +117,6 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
             msg = ('Specify only one of `def_grad_rate`,  `def_grad_aim` '
                    'and `vel_grad`.')
             raise ValueError(msg)
-
-        stress_symbol = 'P'
 
         # If def_grad_aim/rate is masked array, stress masked array should also be passed,
         # such that the two arrays are component-wise exclusive.
@@ -134,6 +133,15 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
             dg_arr = vel_grad
             dg_arr_sym = 'L'
 
+        stress_arr = None
+        stress_arr_sym = None
+        if stress is not None:
+            stress_arr = stress
+            stress_arr_sym = 'P'
+        elif stress_rate is not None:
+            stress_arr = stress_rate
+            stress_arr_sym = 'dot_P'
+
         # If load case tensors are specified as (nested) lists with fill values, convert
         # to masked arrays:
         if isinstance(dg_arr, list):
@@ -141,10 +149,10 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
                 dg_arr = [j for i in dg_arr for j in i]  # flatten
             dg_arr = masked_array_from_list(dg_arr, fill_value='x').reshape((3, 3))
 
-        if isinstance(stress, list):
-            if isinstance(stress[0], list):
-                stress = [j for i in stress for j in i]  # flatten
-            stress = masked_array_from_list(stress, fill_value='x').reshape((3, 3))
+        if isinstance(stress_arr, list):
+            if isinstance(stress_arr[0], list):
+                stress_arr = [j for i in stress_arr for j in i]  # flatten
+            stress_arr = masked_array_from_list(stress_arr, fill_value='x').reshape((3, 3))
 
         load_step = {
             'boundary_conditions': {
@@ -153,7 +161,7 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
         }
         bc_mech = load_step['boundary_conditions']['mechanical']
 
-        if stress is None:
+        if stress_arr is None:
 
             if dg_arr is None:
                 msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
@@ -161,14 +169,14 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
                 raise ValueError(msg)
 
             if isinstance(dg_arr, np.ma.core.MaskedArray):
-                msg = ('To use mixed boundary conditions, `stress` must be '
+                msg = ('To use mixed boundary conditions, `stress`/`stress_rate` must be '
                        'passed as a masked array.')
                 raise ValueError(msg)
 
             bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
 
         else:
-            if isinstance(stress, np.ma.core.MaskedArray):
+            if isinstance(stress_arr, np.ma.core.MaskedArray):
 
                 if dg_arr is None:
                     msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
@@ -176,11 +184,11 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
                     raise ValueError(msg)
 
                 msg = ('`def_grad_rate`, `def_grad_aim` or `vel_grad` must be '
-                       'component-wise exclusive with `stress` (both as '
+                       'component-wise exclusive with `stress` or `stress_rate` (both as '
                        'masked arrays)')
                 if not isinstance(dg_arr, np.ma.core.MaskedArray):
                     raise ValueError(msg)
-                if np.any(dg_arr.mask == stress.mask):
+                if np.any(dg_arr.mask == stress_arr.mask):
                     raise ValueError(msg)
 
                 if dg_arr_sym == 'L':
@@ -190,15 +198,15 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
                         raise ValueError(msg)
 
                 bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
-                bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
+                bc_mech[stress_arr_sym] = format_1D_masked_array(stress_arr.flat)
 
             else:
                 if dg_arr is not None:
-                    msg = ('To use mixed boundary conditions, `stress` must '
-                           'be passed as a masked array.')
+                    msg = ('To use mixed boundary conditions, `stress` or `stress_rate`'
+                           f'must be passed as a masked array.')
                     raise ValueError(msg)
 
-                bc_mech[stress_symbol] = format_1D_masked_array(stress.flat)
+                bc_mech[stress_arr_sym] = format_1D_masked_array(stress_arr.flat)
 
         if rot is not None:
             rot = np.array(rot)
