@@ -1,11 +1,16 @@
 # Change Log
 
+## [0.2.17] - 2021.11.09
+
+### Changed
+
+- Support `stress_rate` (i.e. `dot_P`) in `write_load_case`.
+
 ## [0.2.16] - 2021.10.13
 
 ### Changed
 
 - Update `ParticleDistribution` so a perpendicular vector is calculated for either of `major_axis_direction` or `major_plane_normal_direction` if only one of these is specified.
-- Support `stress_rate` (i.e. `dot_P`) in `write_load_case`.
 
 ## [0.2.15] - 2021.10.05
 
