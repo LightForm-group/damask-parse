@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.2.18] - 20xx.xx.xx
+
+### Changed
+
+- Include the `orientation_coordinate_system` (e.g. `{'x': 'RD', 'y': 'TD', 'z': 'ND'}`) in `validate_orientations`.
+
+
 ## [0.2.17] - 2021.11.09
 
 ### Changed

@@ -869,6 +869,8 @@ def validate_orientations(orientations):
             unit_cell_alignment : dict
                 Alignment of the unit cell.
             quat_component_ordering: str ("scalar-vector" or "vector-scalar")
+            orientation_coordinate_system : dict, optional
+                Mapping between Cartesian directions and sample coordinate system labels.
 
     Returns
     -------
@@ -888,6 +890,8 @@ def validate_orientations(orientations):
                 this will be set to +1.
             quat_component_ordering: str ("scalar-vector" or "vector-scalar")
                 Value will be set to "scalar-vector".
+            orientation_coordinate_system : dict, optional
+                Mapping between Cartesian directions and sample coordinate system labels.
 
     References
     ----------
@@ -905,6 +909,7 @@ def validate_orientations(orientations):
     quats = orientations.get('quaternions')
     quats_comp_order = orientations.get('quat_component_ordering')
     alignment = orientations.get('unit_cell_alignment')
+    OCS = orientations.get('orientation_coordinate_system')
 
     ALLOWED_QUAT_ORDER = ['scalar-vector', 'vector-scalar']
 
@@ -998,6 +1003,15 @@ def validate_orientations(orientations):
         'use_max_precision': orientations.get('use_max_precision', False),
         'P': P,
     }
+
+    if OCS:
+        allowed_OCS_keys = {'x', 'y', 'z'}
+        OCS_keys = set(OCS.keys())
+        if OCS_keys - allowed_OCS_keys:
+            msg = ('If specified, `orientation_coordinate_system` must be a dict with '
+                   f'one or more of the keys: "x", "y" or "z".')
+            raise ValueError(msg)
+        orientations_valid.update({'orientation_coordinate_system': OCS})
 
     return orientations_valid
 
