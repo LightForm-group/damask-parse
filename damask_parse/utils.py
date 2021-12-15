@@ -567,9 +567,7 @@ def normalise_inc(inc, incs_in_file, default=0):
     return inc
 
 
-def parse_inc_specs(inc_specs, sim_data):
-    inc_prefix = 'increment_'
-    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+def parse_inc_specs(inc_specs, incs_in_file):
 
     # nothing specified, default to all
     if not inc_specs:
@@ -617,6 +615,15 @@ def parse_inc_specs(inc_specs, sim_data):
     return sorted(list(incs_in_file))
 
 
+def parse_inc_specs_using_result_obj(inc_specs, sim_data):
+    """Parse increment spec using the Result object for validation."""
+
+    inc_prefix = 'increment_'
+    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+
+    return parse_inc_specs(inc_specs, incs_in_file)
+
+
 def apply_transforms(data, transforms, single_inc):
     if data.size == 0:
         return data
@@ -655,7 +662,7 @@ def process_damask_orientatons(ori_data):
 def increment_generator(increments, sim_data):
     inc_prefix = 'increment_'
 
-    for inc in parse_inc_specs(increments, sim_data):
+    for inc in parse_inc_specs_using_result_obj(increments, sim_data):
         sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
 
         yield inc, sim_data
