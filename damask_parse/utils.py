@@ -567,9 +567,7 @@ def normalise_inc(inc, incs_in_file, default=0):
     return inc
 
 
-def parse_inc_specs(inc_specs, sim_data):
-    inc_prefix = 'increment_'
-    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+def parse_inc_specs(inc_specs, incs_in_file):
 
     # nothing specified, default to all
     if not inc_specs:
@@ -617,6 +615,15 @@ def parse_inc_specs(inc_specs, sim_data):
     return sorted(list(incs_in_file))
 
 
+def parse_inc_specs_using_result_obj(inc_specs, sim_data):
+    """Parse increment spec using the Result object for validation."""
+
+    inc_prefix = 'increment_'
+    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+
+    return parse_inc_specs(inc_specs, incs_in_file)
+
+
 def apply_transforms(data, transforms, single_inc):
     if data.size == 0:
         return data
@@ -655,7 +662,7 @@ def process_damask_orientatons(ori_data):
 def increment_generator(increments, sim_data):
     inc_prefix = 'increment_'
 
-    for inc in parse_inc_specs(increments, sim_data):
+    for inc in parse_inc_specs_using_result_obj(increments, sim_data):
         sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
 
         yield inc, sim_data
@@ -869,6 +876,8 @@ def validate_orientations(orientations):
             unit_cell_alignment : dict
                 Alignment of the unit cell.
             quat_component_ordering: str ("scalar-vector" or "vector-scalar")
+            orientation_coordinate_system : dict, optional
+                Mapping between Cartesian directions and sample coordinate system labels.
 
     Returns
     -------
@@ -888,6 +897,8 @@ def validate_orientations(orientations):
                 this will be set to +1.
             quat_component_ordering: str ("scalar-vector" or "vector-scalar")
                 Value will be set to "scalar-vector".
+            orientation_coordinate_system : dict, optional
+                Mapping between Cartesian directions and sample coordinate system labels.
 
     References
     ----------
@@ -905,6 +916,7 @@ def validate_orientations(orientations):
     quats = orientations.get('quaternions')
     quats_comp_order = orientations.get('quat_component_ordering')
     alignment = orientations.get('unit_cell_alignment')
+    OCS = orientations.get('orientation_coordinate_system')
 
     ALLOWED_QUAT_ORDER = ['scalar-vector', 'vector-scalar']
 
@@ -998,6 +1010,15 @@ def validate_orientations(orientations):
         'use_max_precision': orientations.get('use_max_precision', False),
         'P': P,
     }
+
+    if OCS:
+        allowed_OCS_keys = {'x', 'y', 'z'}
+        OCS_keys = set(OCS.keys())
+        if OCS_keys - allowed_OCS_keys:
+            msg = ('If specified, `orientation_coordinate_system` must be a dict with '
+                   f'one or more of the keys: "x", "y" or "z".')
+            raise ValueError(msg)
+        orientations_valid.update({'orientation_coordinate_system': OCS})
 
     return orientations_valid
 
