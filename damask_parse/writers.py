@@ -78,7 +78,7 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     return geom_path
 
 
-def write_load_case(dir_path, load_cases, name='load.yaml'):
+def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, name='load.yaml'):
     """Write the load file for a DAMASK simulation.
 
     Parameters
@@ -86,7 +86,8 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
     dir_path : str or Path
         Directory in which to generate the file(s).
     load_cases : list of dict
-
+    solver : dict of (str: str)
+    initial_conditions : dict of (str: dict)
     name : str, optional
         Name of the load file to write. By default, set to "load.yaml".
 
@@ -97,6 +98,11 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
 
     """
     from damask import Rotation
+
+    if solver is None:
+        solver = {
+            'mechanical': 'spectral_basic',
+        }
 
     load_steps = []
 
@@ -230,11 +236,12 @@ def write_load_case(dir_path, load_cases, name='load.yaml'):
         load_steps.append(load_step)
 
     load_data = {
-        'solver': {
-            'mechanical': 'spectral_basic'
-        },
+        'solver': solver,
         'loadstep': load_steps
     }
+
+    if initial_conditions is not None:
+        load_data['initial_conditions'] = initial_conditions
 
     dir_path = Path(dir_path).resolve()
     load_path = dir_path.joinpath(name)
