@@ -273,7 +273,9 @@ def parse_damask_spectral_version_info(executable='DAMASK_spectral'):
     return damask_spectral_info
 
 
-def volume_element_from_2D_microstructure(microstructure_image, phase_label, homog_label,
+def volume_element_from_2D_microstructure(microstructure_image, homog_label,
+                                          phase_label=None, 
+                                          phase_label_mapping=None,
                                           depth=1, image_axes=['y', 'x']):
     """Extrude a 2D microstructure by a given depth to form a 3D volume element.
 
@@ -287,13 +289,21 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
                 Dict with the following keys:
                     type: str, "quat"
                     quaternions : ndarray of shape (P, 4) of float
-                        Array of P row four-vectors of unit quaternions.   
+                        Array of P row four-vectors of unit quaternions.
                     unit_cell_alignment : dict
                         Alignment of the unit cell.
-    phase_label : str
-        Label of the phase. Only single phase supported.
+            scale : float, optional
+            grain_phases: list of int
+                Index of phase assigned to each grain
+            phase_labels: list of str
+                Label of each phase
     homog_label : str
         Homogenization scheme label.
+    phase_label : str, optional
+        Label of the phase for single phase.
+    phase_label_mapping: dict, optional
+        Mapping from phase labels in the `microstructure_image` to phase
+        labels for created in the VE.
     depth : int, optional
         By how many voxels the microstructure should be extruded. By default, 1.
     image_axes : list, optional
@@ -306,6 +316,16 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
         `validate_volume_element`.
 
     """
+    if phase_label is not None and phase_label_mapping is not None:
+        msg = ('Specify either a single `phase_label` or a '
+               '`phase_label_mapping`, not both.')
+        raise ValueError(msg)
+    if (phase_label is None and
+            ('grain_phases' not in microstructure_image or
+             'phase_labels' not in microstructure_image)):
+        msg = ('`phase_label` must be specified for a `microstructure_image` '
+               'without `grain_phases` and `grain_phases`.')
+        raise ValueError(msg)
 
     # parse image axis directions and add extrusion direction (all +ve only)
     conv_axis = {'x': 0, 'y': 1, 'z': 2}
@@ -322,9 +342,35 @@ def volume_element_from_2D_microstructure(microstructure_image, phase_label, hom
         'grid_size': grain_idx.shape,
         'orientations': microstructure_image['orientations'],
         'element_material_idx': grain_idx,
-        'phase_labels': [phase_label],
-        'homog_label': homog_label,
     }
+    # single phase VE
+    if phase_label is not None:
+        if ('phase_labels' in microstructure_image and
+                len(microstructure_image['phase_labels']) > 1):
+            print('Warning: assigning a single phase to an microstructure '
+                  'with more than one phase.')
+        volume_element.update({
+            'phase_labels': [phase_label],
+            'homog_label': homog_label,
+        })
+
+    # multi phase VE
+    else:
+        phase_labels = microstructure_image['phase_labels']
+        if phase_label_mapping is not None:
+            phase_labels = [phase_label_mapping[lab] for lab in phase_labels]
+        grain_phase_labels = np.array(
+            [phase_labels[i] for i in microstructure_image['grain_phases']])
+
+        num_grains = len(microstructure_image['grain_phases'])
+        volume_element.update({
+            'constituent_material_idx': np.arange(num_grains),
+            'constituent_material_fraction': np.ones(num_grains),
+            'constituent_phase_label': grain_phase_labels,
+            'constituent_orientation_idx': np.arange(num_grains),
+            'material_homog': np.full(num_grains, homog_label),
+        })
+
     volume_element = validate_volume_element(volume_element)
 
     return volume_element
@@ -369,8 +415,9 @@ def add_volume_element_buffer_zones(volume_element, buffer_sizes, phase_ids, pha
 
     if 'size' in volume_element:
         # scale size based on material added
-        new_size = tuple(s / og * ng for og, ng, s in zip(grid,
-                                                          new_grid, volume_element['size']))
+        new_size = tuple(s / og * ng for og, ng, s in zip(
+            grid, new_grid, volume_element['size'])
+        )
 
     # validate new phases
     phase_ids_unq = sorted(set(pid for pid, bs in zip(phase_ids, buffer_sizes) if bs > 0))
@@ -1064,7 +1111,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
                     quaternions : ndarray of shape (R, 4) of float
                         Array of R row four-vectors of unit quaternions.
                     unit_cell_alignment : dict
-                        Alignment of the unit cell.                        
+                        Alignment of the unit cell.
                     P : int
                         The "P" constant, either +1 or -1, as defined within [1].
 
@@ -1074,7 +1121,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         P J Konijnenberg, and M De Graef. "Consistent Representations
         of and Conversions between 3D Rotations". Modelling and Simulation
         in Materials Science and Engineering 23, no. 8 (1 December 2015):
-        083501. https://doi.org/10.1088/0965-0393/23/8/083501.                         
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.
 
     """
 
