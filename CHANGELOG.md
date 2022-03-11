@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.19] - 2022.03.11
+
+### Added
+
+- Add creation of a VE with multiple phases from a microstructure image.
+
 ## [0.2.19] - 2022.02.15
 
 ### Changed
