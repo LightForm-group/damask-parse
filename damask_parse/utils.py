@@ -1731,7 +1731,8 @@ def spread_orientations(volume_element, phase_name, sigma):
         base_ori = volume_element["orientations"]["quaternions"][
             volume_element["constituent_orientation_idx"][const_idx_i]
         ]
-        base_ori_dmsk = Rotation.from_quaternion(base_ori)
+        P_val = volume_element["orientations"]['P']
+        base_ori_dmsk = Rotation.from_quaternion(base_ori, P=P_val)
 
         elem_idx = np.where(volume_element["element_material_idx"] == const_idx_i)
         num_elems = len(elem_idx[0])
