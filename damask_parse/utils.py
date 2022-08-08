@@ -1698,3 +1698,95 @@ def perpendicular_vectors(vec, axis=-1):
     perp_vec = np.swapaxes(perp_vec, -1, axis)
 
     return perp_vec
+
+def spread_orientations(volume_element, phase_names, sigmas):
+    """Split DAMASK single-constituent materials into multiple materials with an
+    orientation spread.
+
+    Parameters
+    ----------
+    volume_element : dict
+    phase_name : str
+        Name of the phase for which constituents (i.e. materials) will be split.
+
+    Returns
+    -------
+    volume_element : dict
+        A new volume element with possibly more constituents corresponding to spread
+        orientations.
+
+    """
+
+    from damask import Rotation
+
+    volume_element = copy.deepcopy(volume_element)
+
+    for phase_name in phase_names:
+        sigma = sigmas[phase_names.index(phase_name)]
+
+        # identify constituents (i.e. materials) belonging to the specified phase:
+        const_idx = np.where(volume_element["constituent_phase_label"] == phase_name)[0]
+
+        # each identified constituent will be split into one or more constituents, corresponding
+        # to the number of assigned voxels:
+        for const_idx_i in const_idx:
+
+            base_ori = volume_element["orientations"]["quaternions"][
+                volume_element["constituent_orientation_idx"][const_idx_i]
+            ]
+            P_val = volume_element["orientations"]['P']
+            base_ori_dmsk = Rotation.from_quaternion(base_ori, P=P_val)
+
+            elem_idx = np.where(volume_element["element_material_idx"] == const_idx_i)
+            num_elems = len(elem_idx[0])
+
+            # generate a set of orientations that have a defined spread:
+            spread_oris = Rotation.from_spherical_component(
+                base_ori_dmsk, sigma=sigma, degrees=True, N=num_elems
+            )
+
+            cur_num_consts = volume_element["constituent_material_idx"].shape[0]
+            cur_num_oris = volume_element["orientations"]["quaternions"].shape[0]
+
+            # We add (num_elems - 1) new constituents because the pre-existing constituent
+            # is reused for the first spread orientation:
+            const_mat_idx_add = np.arange(cur_num_consts, cur_num_consts + (num_elems - 1))
+            const_ori_idx_add = np.arange(cur_num_oris, cur_num_oris + (num_elems - 1))
+            const_mat_frac_add = np.ones((num_elems - 1), dtype=float)
+            const_phase_label_add = np.array([phase_name] * (num_elems - 1))
+            homog_lab = volume_element["material_homog"][const_idx_i]
+            mat_homog_add = np.array([homog_lab] * (num_elems - 1))
+
+            volume_element["orientations"]["quaternions"][const_idx_i] = spread_oris[
+                0
+            ].quaternion
+            volume_element["orientations"]["quaternions"] = np.vstack(
+                [
+                    volume_element["orientations"]["quaternions"],
+                    spread_oris[1:],
+                ]
+            )
+            volume_element["constituent_material_idx"] = np.concatenate(
+                [volume_element["constituent_material_idx"], const_mat_idx_add]
+            )
+            volume_element["constituent_orientation_idx"] = np.concatenate(
+                [volume_element["constituent_orientation_idx"], const_ori_idx_add]
+            )
+            volume_element["constituent_material_fraction"] = np.concatenate(
+                [volume_element["constituent_material_fraction"], const_mat_frac_add]
+            )
+            volume_element["constituent_phase_label"] = np.concatenate(
+                [volume_element["constituent_phase_label"], const_phase_label_add]
+            )
+            volume_element["material_homog"] = np.concatenate(
+                [volume_element["material_homog"], mat_homog_add]
+            )
+
+            for idx, elem_idx_i in enumerate(zip(*elem_idx)):
+                if idx == 0:
+                    continue
+                volume_element["element_material_idx"][elem_idx_i] = const_mat_idx_add[
+                    idx - 1
+                ]
+
+    return volume_element
