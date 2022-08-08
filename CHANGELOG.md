@@ -1,6 +1,11 @@
 # Change Log
 
-## [0.2.19] - 2022.03.11
+## [0.2.21] - 2022.08.08
+
+### Added
+- Add `spread_orientations` function to apply orientation scatter to a volume element.
+
+## [0.2.20] - 2022.03.11
 
 ### Added
 
