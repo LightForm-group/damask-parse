@@ -1521,8 +1521,9 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
                     raise ValueError(msg)
 
-                if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
-                    # Convert from y//b to x//a:
+                if (volume_element['orientations']['unit_cell_alignment'].get('y') == 'b' and
+                    volume_element['orientations']['unit_cell_alignment'].get('y') == 'a'):
+                    # Convert from y//b or y//a to x//a or x//b:
                     hex_transform_quat = axang2quat(
                         volume_element['orientations']['P'] * np.array(
                             [0, 0, 1], dtype=np.longdouble),
@@ -1534,7 +1535,8 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                         P=volume_element['orientations']['P'],
                     )
 
-                elif volume_element['orientations']['unit_cell_alignment'].get('x') != 'a':
+                elif (volume_element['orientations']['unit_cell_alignment'].get('x') != 'a' and
+                      volume_element['orientations']['unit_cell_alignment'].get('x') != 'b'):
                     msg = (f'Cannot convert from the following specified unit cell '
                            f'alignment to DAMASK-compatible unit cell alignment (x//a): '
                            f'{volume_element["orientations"]["unit_cell_alignment"]}')
