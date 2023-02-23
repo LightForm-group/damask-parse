@@ -1521,39 +1521,38 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
                     raise ValueError(msg)
 
+                transform_angle = None
                 x_align = volume_element['orientations']['unit_cell_alignment'].get('x')
                 y_align = volume_element['orientations']['unit_cell_alignment'].get('y')
-
-                if (x_align == "a*" or y_align == "b"):
-                    # case 1; rotate by 30 degrees about `z` (as currently implemented)
+                if x_align == "a*" or y_align == "b":
+                    # rotate by 30 degrees about `z`
+                    transform_angle = np.pi/6
+                elif x_align == "b*" or y_align == "a":
+                    # rotate by 90 degrees about `-z`
+                    transform_angle = -np.pi/2
+                elif x_align == "a" or y_align == "b*":
+                    # already in DAMASK convention
+                    pass 
+                elif x_align == "b" or y_align == "a*":
+                    # rotate by 120 degrees about `z`
+                    transform_angle = 2*np.pi/3
+                else:
+                    msg = (f'Cannot convert from the following specified unit cell '
+                           f'alignment to DAMASK-compatible unit cell alignment (x//a): '
+                           f'{volume_element["orientations"]["unit_cell_alignment"]}')
+                    NotImplementedError(msg)
+                
+                if transform_angle is not None:
                     hex_transform_quat = axang2quat(
                         volume_element['orientations']['P'] * np.array(
                             [0, 0, 1], dtype=np.longdouble),
-                        np.longdouble(np.pi/6)
+                        np.longdouble(transform_angle)
                     )
                     mat_i_const_j_ori = multiply_quaternions(
                         q1=hex_transform_quat,
                         q2=mat_i_const_j_ori,
                         P=volume_element['orientations']['P'],
-                    )
-                    
-                if (x_align == "b*" or y_align == "a"):
-                    # case 3; rotate by 90 degrees about `-z`, assuming z-out - which I guess we are, since we don't track it
-                    hex_transform_quat = axang2quat(
-                        volume_element['orientations']['P'] * np.array(
-                            [0, 0, -1], dtype=np.longdouble),
-                        np.longdouble(np.pi/2)
-                    )
-                    mat_i_const_j_ori = multiply_quaternions(
-                        q1=hex_transform_quat,
-                        q2=mat_i_const_j_ori,
-                        P=volume_element['orientations']['P'],
-                    )
-
-                elif (x_align == "a" or y_align == "b*"):
-                    pass # already in DAMASK convention
-                else:
-                    raise NotImplementedError
+                    )  
 
             if volume_element['orientations']['P'] != P:
                 # Make output quaternions consistent with desired "P" convention, as
