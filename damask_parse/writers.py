@@ -256,7 +256,8 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
     dir_path = Path(dir_path).resolve()
     load_path = dir_path.joinpath(name)
     yaml = YAML()
-    yaml.dump(load_data, load_path)
+    with load_path.open("wt", newline="\n") as fp:
+        yaml.dump(load_data, fp)
 
     return load_path
 
@@ -386,7 +387,8 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     dir_path = Path(dir_path).resolve()
     mat_path = dir_path.joinpath(name)
     yaml = YAML()
-    yaml.dump(mat_data_fmt, mat_path)
+    with mat_path.open("wt", newline="\n") as fp:
+        yaml.dump(mat_data_fmt, fp)
 
     return mat_path
 
