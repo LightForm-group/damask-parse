@@ -1,5 +1,7 @@
 """`damask_parse.utils.py`"""
 
+from contextlib import contextmanager
+import os
 from pathlib import Path
 from subprocess import run, PIPE
 import copy
@@ -234,6 +236,17 @@ def format_1D_masked_array(arr, fill_symbol='x'):
     return [x.item() if not isinstance(x, np.ma.core.MaskedConstant)
             else fill_symbol for x in arr]
 
+def format_2D_masked_array(arr, fill_symbol="x"):
+    out = []
+    for x in arr:
+        sub = []
+        for i in x:
+            val = (
+                i.item() if not isinstance(i, np.ma.core.MaskedConstant) else fill_symbol
+            )
+            sub.append(val)
+        out.append(sub)
+    return out
 
 def masked_array_from_list(arr, fill_value='x'):
     """Generate a (masked) array from a 1D list whose elements may contain a fill value."""
@@ -710,7 +723,12 @@ def increment_generator(increments, sim_data):
     inc_prefix = 'increment_'
 
     for inc in parse_inc_specs_using_result_obj(increments, sim_data):
-        sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
+        try:
+            # known: v3 alpha 3
+            sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
+        except TypeError:
+            # known: v3 alpha 7
+            sim_data = sim_data.view(increments=f"{inc_prefix}{inc}")
 
         yield inc, sim_data
 
@@ -791,7 +809,12 @@ def get_phase_data(sim_data, field_name, phase_name, increments,
     phase_data = []
     incs_valid = []
     for inc, sim_data in increment_generator(increments, sim_data):
-        data = sim_data.view('phases', phase_name).get(output=field_name)
+        try:
+            # known: v3 alpha 3
+            data = sim_data.view('phases', phase_name).get(output=field_name)
+        except TypeError:
+            # known: v3 alpha 7
+            data = sim_data.view(phases=phase_name).get(output=field_name)
 
         if data is None:
             print(f"Could not find field '{field_name}' for phase "
