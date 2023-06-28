@@ -1827,3 +1827,105 @@ def spread_orientations(volume_element, phase_names, sigmas):
                 ]
 
     return volume_element
+
+@contextmanager
+def working_directory(path):
+    """Change to a working directory and return to previous working directory on exit."""
+    prev_cwd = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
+
+def visualise_static_outpurts(outputs, result, parsed_outs):
+    """Create separate VTK file for grain and phase maps."""
+
+    static_outputs = ['grain', 'phase']
+
+    if isinstance(outputs, list):
+        static_outputs = list(set(outputs).intersection(static_outputs))
+        if len(static_outputs) > 0:
+            v = result.geometry0
+
+            for static_output in static_outputs:
+                outputs.remove(static_output)
+                dat_array = parsed_outs['field_data'][static_output]['data']
+                try:
+                    # known: v3 alpha 3
+                    v.add(dat_array.flatten(order='F'), label=static_output)
+                except AttributeError:
+                    # known: v3 alpha 7
+                    v.set(data=dat_array.flatten(order='F'), label=static_output)
+
+            v.save('static_outputs')
+
+    return outputs
+
+def generate_viz(hdf5_path, viz_spec, parsed_outs):
+    if viz_spec is not None:
+
+        from damask import Result
+
+        if viz_spec is True:
+            viz_spec = [{}]
+        elif isinstance(viz_spec, dict):
+            viz_spec = [viz_spec]
+
+        os.mkdir('viz')
+        with working_directory('viz'):
+
+            result = Result(hdf5_path)
+
+            for viz_dict_idx, viz_dict in enumerate(viz_spec, 1):
+
+                if len(viz_spec) > 1:
+                    viz_dir = str(viz_dict_idx)
+                    os.mkdir(viz_dir)
+                else:
+                    viz_dir = '.'
+                with working_directory(viz_dir):
+
+                    try:
+                        # all incs if not specified:
+                        incs_spec = viz_dict.get('increments', None)
+                        parsed_incs = parse_inc_specs_using_result_obj(incs_spec, result)
+                        try:
+                            # known: v3 alpha 3
+                            result = result.view('increments', parsed_incs)
+                        except TypeError:
+                            # known: v3 alpha 7
+                            result = result.view(increments=parsed_incs)
+
+                        # all phases if not specified:
+                        phases = viz_dict.get('phases', True)
+                        try:
+                            # known: v3 alpha 3
+                            result = result.view('phases', phases)
+                        except TypeError:
+                            # known: v3 alpha 7
+                            result = result.view(phases=phases)
+
+                        # all homogs if not specified:
+                        homogs = viz_dict.get('homogenizations', True)
+                        try:
+                            # known: v3 alpha 3
+                            result = result.view('homogenizations', homogs)
+                        except TypeError:
+                            # known: v3 alpha 7
+                            result = result.view(homogenizations=homogs)
+
+                        # all outputs if not specified:
+                        outputs = viz_dict.get('fields', '*')
+
+                        outputs = visualise_static_outpurts(outputs, result, parsed_outs)
+
+                        # result.save_VTK(output=outputs)
+                        result.export_VTK(output=outputs)
+
+                    except Exception as err:
+                        print(f'Could not save VTK files for visualise item: {viz_dict}. '
+                              f'Exception was: {err}')
+                        continue
+
+    
