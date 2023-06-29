@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.2.22] - 2023.06.29
+
+### Added
+
+- Support for using version 3.0.0-alpha7 of the damask python package
+- Support for writing input files on Windows
+
+### Fixed
+
+- HCP unit cell alignment check
+
 ## [0.2.21] - 2022.08.08
 
 ### Added
