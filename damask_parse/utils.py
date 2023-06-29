@@ -1,5 +1,7 @@
 """`damask_parse.utils.py`"""
 
+from contextlib import contextmanager
+import os
 from pathlib import Path
 from subprocess import run, PIPE
 import copy
@@ -234,6 +236,17 @@ def format_1D_masked_array(arr, fill_symbol='x'):
     return [x.item() if not isinstance(x, np.ma.core.MaskedConstant)
             else fill_symbol for x in arr]
 
+def format_2D_masked_array(arr, fill_symbol="x"):
+    out = []
+    for x in arr:
+        sub = []
+        for i in x:
+            val = (
+                i.item() if not isinstance(i, np.ma.core.MaskedConstant) else fill_symbol
+            )
+            sub.append(val)
+        out.append(sub)
+    return out
 
 def masked_array_from_list(arr, fill_value='x'):
     """Generate a (masked) array from a 1D list whose elements may contain a fill value."""
@@ -710,7 +723,12 @@ def increment_generator(increments, sim_data):
     inc_prefix = 'increment_'
 
     for inc in parse_inc_specs_using_result_obj(increments, sim_data):
-        sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
+        try:
+            # known: v3 alpha 3
+            sim_data = sim_data.view('increments', f"{inc_prefix}{inc}")
+        except TypeError:
+            # known: v3 alpha 7
+            sim_data = sim_data.view(increments=f"{inc_prefix}{inc}")
 
         yield inc, sim_data
 
@@ -791,7 +809,12 @@ def get_phase_data(sim_data, field_name, phase_name, increments,
     phase_data = []
     incs_valid = []
     for inc, sim_data in increment_generator(increments, sim_data):
-        data = sim_data.view('phases', phase_name).get(output=field_name)
+        try:
+            # known: v3 alpha 3
+            data = sim_data.view('phases', phase_name).get(output=field_name)
+        except TypeError:
+            # known: v3 alpha 7
+            data = sim_data.view(phases=phase_name).get(output=field_name)
 
         if data is None:
             print(f"Could not find field '{field_name}' for phase "
@@ -1521,24 +1544,38 @@ def get_volume_element_materials(volume_element, homog_schemes=None, phases=None
                     msg = 'Orientation `unit_cell_alignment` must be specified.'
                     raise ValueError(msg)
 
-                if volume_element['orientations']['unit_cell_alignment'].get('y') == 'b':
-                    # Convert from y//b to x//a:
+                transform_angle = None
+                x_align = volume_element['orientations']['unit_cell_alignment'].get('x')
+                y_align = volume_element['orientations']['unit_cell_alignment'].get('y')
+                if x_align == "a*" or y_align == "b":
+                    # rotate by 30 degrees about `z`
+                    transform_angle = np.pi/6
+                elif x_align == "b*" or y_align == "a":
+                    # rotate by 90 degrees about `-z`
+                    transform_angle = -np.pi/2
+                elif x_align == "a" or y_align == "b*":
+                    # already in DAMASK convention
+                    pass 
+                elif x_align == "b" or y_align == "a*":
+                    # rotate by 120 degrees about `z`
+                    transform_angle = 2*np.pi/3
+                else:
+                    msg = (f'Cannot convert from the following specified unit cell '
+                           f'alignment to DAMASK-compatible unit cell alignment (x//a): '
+                           f'{volume_element["orientations"]["unit_cell_alignment"]}')
+                    NotImplementedError(msg)
+                
+                if transform_angle is not None:
                     hex_transform_quat = axang2quat(
                         volume_element['orientations']['P'] * np.array(
                             [0, 0, 1], dtype=np.longdouble),
-                        np.longdouble(np.pi/6)
+                        np.longdouble(transform_angle)
                     )
                     mat_i_const_j_ori = multiply_quaternions(
                         q1=hex_transform_quat,
                         q2=mat_i_const_j_ori,
                         P=volume_element['orientations']['P'],
-                    )
-
-                elif volume_element['orientations']['unit_cell_alignment'].get('x') != 'a':
-                    msg = (f'Cannot convert from the following specified unit cell '
-                           f'alignment to DAMASK-compatible unit cell alignment (x//a): '
-                           f'{volume_element["orientations"]["unit_cell_alignment"]}')
-                    NotImplementedError(msg)
+                    )  
 
             if volume_element['orientations']['P'] != P:
                 # Make output quaternions consistent with desired "P" convention, as
@@ -1790,3 +1827,105 @@ def spread_orientations(volume_element, phase_names, sigmas):
                 ]
 
     return volume_element
+
+@contextmanager
+def working_directory(path):
+    """Change to a working directory and return to previous working directory on exit."""
+    prev_cwd = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
+
+def visualise_static_outpurts(outputs, result, parsed_outs):
+    """Create separate VTK file for grain and phase maps."""
+
+    static_outputs = ['grain', 'phase']
+
+    if isinstance(outputs, list):
+        static_outputs = list(set(outputs).intersection(static_outputs))
+        if len(static_outputs) > 0:
+            v = result.geometry0
+
+            for static_output in static_outputs:
+                outputs.remove(static_output)
+                dat_array = parsed_outs['field_data'][static_output]['data']
+                try:
+                    # known: v3 alpha 3
+                    v.add(dat_array.flatten(order='F'), label=static_output)
+                except AttributeError:
+                    # known: v3 alpha 7
+                    v.set(data=dat_array.flatten(order='F'), label=static_output)
+
+            v.save('static_outputs')
+
+    return outputs
+
+def generate_viz(hdf5_path, viz_spec, parsed_outs):
+    if viz_spec is not None:
+
+        from damask import Result
+
+        if viz_spec is True:
+            viz_spec = [{}]
+        elif isinstance(viz_spec, dict):
+            viz_spec = [viz_spec]
+
+        os.mkdir('viz')
+        with working_directory('viz'):
+
+            result = Result(hdf5_path)
+
+            for viz_dict_idx, viz_dict in enumerate(viz_spec, 1):
+
+                if len(viz_spec) > 1:
+                    viz_dir = str(viz_dict_idx)
+                    os.mkdir(viz_dir)
+                else:
+                    viz_dir = '.'
+                with working_directory(viz_dir):
+
+                    try:
+                        # all incs if not specified:
+                        incs_spec = viz_dict.get('increments', None)
+                        parsed_incs = parse_inc_specs_using_result_obj(incs_spec, result)
+                        try:
+                            # known: v3 alpha 3
+                            result = result.view('increments', parsed_incs)
+                        except TypeError:
+                            # known: v3 alpha 7
+                            result = result.view(increments=parsed_incs)
+
+                        # all phases if not specified:
+                        phases = viz_dict.get('phases', True)
+                        try:
+                            # known: v3 alpha 3
+                            result = result.view('phases', phases)
+                        except TypeError:
+                            # known: v3 alpha 7
+                            result = result.view(phases=phases)
+
+                        # all homogs if not specified:
+                        homogs = viz_dict.get('homogenizations', True)
+                        try:
+                            # known: v3 alpha 3
+                            result = result.view('homogenizations', homogs)
+                        except TypeError:
+                            # known: v3 alpha 7
+                            result = result.view(homogenizations=homogs)
+
+                        # all outputs if not specified:
+                        outputs = viz_dict.get('fields', '*')
+
+                        outputs = visualise_static_outpurts(outputs, result, parsed_outs)
+
+                        # result.save_VTK(output=outputs)
+                        result.export_VTK(output=outputs)
+
+                    except Exception as err:
+                        print(f'Could not save VTK files for visualise item: {viz_dict}. '
+                              f'Exception was: {err}')
+                        continue
+
+    
