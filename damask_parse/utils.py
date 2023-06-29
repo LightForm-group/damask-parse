@@ -1850,7 +1850,7 @@ def visualise_static_outpurts(outputs, result, parsed_outs):
 
             for static_output in static_outputs:
                 outputs.remove(static_output)
-                dat_array = parsed_outs['field_data'][static_output]['data']
+                dat_array = np.array(parsed_outs['field_data'][static_output]['data'])
                 try:
                     # known: v3 alpha 3
                     v.add(dat_array.flatten(order='F'), label=static_output)
@@ -1872,60 +1872,53 @@ def generate_viz(hdf5_path, viz_spec, parsed_outs):
         elif isinstance(viz_spec, dict):
             viz_spec = [viz_spec]
 
-        os.mkdir('viz')
-        with working_directory('viz'):
+        result = Result(hdf5_path)
 
-            result = Result(hdf5_path)
+        Path('viz').mkdir(exist_ok=True)
+        with working_directory('viz'):
 
             for viz_dict_idx, viz_dict in enumerate(viz_spec, 1):
 
                 if len(viz_spec) > 1:
                     viz_dir = str(viz_dict_idx)
-                    os.mkdir(viz_dir)
+                    Path(viz_dir).mkdir(exist_ok=True)
                 else:
                     viz_dir = '.'
                 with working_directory(viz_dir):
 
+                    # all incs if not specified:
+                    incs_spec = viz_dict.get('increments', None)
+                    parsed_incs = parse_inc_specs_using_result_obj(incs_spec, result)
                     try:
-                        # all incs if not specified:
-                        incs_spec = viz_dict.get('increments', None)
-                        parsed_incs = parse_inc_specs_using_result_obj(incs_spec, result)
-                        try:
-                            # known: v3 alpha 3
-                            result = result.view('increments', parsed_incs)
-                        except TypeError:
-                            # known: v3 alpha 7
-                            result = result.view(increments=parsed_incs)
+                        # known: v3 alpha 3
+                        result = result.view('increments', parsed_incs)
+                    except TypeError:
+                        # known: v3 alpha 7
+                        result = result.view(increments=parsed_incs)
 
-                        # all phases if not specified:
-                        phases = viz_dict.get('phases', True)
-                        try:
-                            # known: v3 alpha 3
-                            result = result.view('phases', phases)
-                        except TypeError:
-                            # known: v3 alpha 7
-                            result = result.view(phases=phases)
+                    # all phases if not specified:
+                    phases = viz_dict.get('phases', True)
+                    try:
+                        # known: v3 alpha 3
+                        result = result.view('phases', phases)
+                    except TypeError:
+                        # known: v3 alpha 7
+                        result = result.view(phases=phases)
 
-                        # all homogs if not specified:
-                        homogs = viz_dict.get('homogenizations', True)
-                        try:
-                            # known: v3 alpha 3
-                            result = result.view('homogenizations', homogs)
-                        except TypeError:
-                            # known: v3 alpha 7
-                            result = result.view(homogenizations=homogs)
+                    # all homogs if not specified:
+                    homogs = viz_dict.get('homogenizations', True)
+                    try:
+                        # known: v3 alpha 3
+                        result = result.view('homogenizations', homogs)
+                    except TypeError:
+                        # known: v3 alpha 7
+                        result = result.view(homogenizations=homogs)
 
-                        # all outputs if not specified:
-                        outputs = viz_dict.get('fields', '*')
+                    # all outputs if not specified:
+                    outputs = viz_dict.get('fields', '*')
 
-                        outputs = visualise_static_outpurts(outputs, result, parsed_outs)
+                    outputs = visualise_static_outpurts(outputs, result, parsed_outs)
 
-                        # result.save_VTK(output=outputs)
-                        result.export_VTK(output=outputs)
-
-                    except Exception as err:
-                        print(f'Could not save VTK files for visualise item: {viz_dict}. '
-                              f'Exception was: {err}')
-                        continue
-
+                    # result.save_VTK(output=outputs) # v3 alpha 3?
+                    result.export_VTK(output=outputs) # known: v3 alpha 7
     
