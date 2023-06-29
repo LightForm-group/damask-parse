@@ -184,12 +184,11 @@ def read_geom(geom_path):
     return geometry
 
 
-def read_spectral_stdout(path):
-
+def read_spectral_stdout(path, encoding="utf8"):
     path = Path(path)
     inc_split_str = r'\s#{75}'
 
-    with path.open('r', encoding='utf8') as handle:
+    with path.open("r", encoding=encoding) as handle:
         lines = handle.read()
 
         inc_split = re.split(inc_split_str, lines)
@@ -412,7 +411,12 @@ def read_HDF5_file(
 
     """
     if not geom_path:
-        geom_path = Path(hdf5_path).parent / 'geom.vtr'
+        sim_dir = Path(hdf5_path).parent
+        geom_path = sim_dir / 'geom.vtr' # known: v3 alpha 3
+        if not geom_path.is_file():
+            geom_path = sim_dir / "geom.vti" # known: v3 alpha 7
+        if not geom_path.is_file():
+            raise ValueError(f"Cannot find geometry file in path {sim_dir!r}")
 
     # Open DAMASK output file if required
     if operations or volume_data or phase_data or field_data or grain_data:

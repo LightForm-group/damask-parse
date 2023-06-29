@@ -8,6 +8,7 @@ import numpy as np
 from ruamel.yaml import YAML
 
 from damask_parse.utils import (
+    format_2D_masked_array,
     zeropad,
     format_1D_masked_array,
     align_orientations,
@@ -78,7 +79,8 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     return geom_path
 
 
-def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, name='load.yaml'):
+def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
+                    name='load.yaml', write_2D_arrs=False):
     """Write the load file for a DAMASK simulation.
 
     Parameters
@@ -90,6 +92,10 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, 
     initial_conditions : dict of (str: dict)
     name : str, optional
         Name of the load file to write. By default, set to "load.yaml".
+    write_2D_arrs : bool
+        If True, write out mechanical boundary condition arrays (stress, deformation
+        gradient, etc.) as list of lists (known to work in v3.0.0-alpha7) rather than 1D
+        lists (known to work in v3.0.0-alpha3).
 
     Returns
     -------
@@ -105,6 +111,10 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, 
         }
 
     load_steps = []
+    if write_2D_arrs:
+        fmt_arr_func = format_2D_masked_array
+    else:
+        fmt_arr_func = lambda x: format_1D_masked_array(x.flat)
 
     for load_case in load_cases:
 
@@ -179,7 +189,7 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, 
                        'passed as a masked array.')
                 raise ValueError(msg)
 
-            bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
+            bc_mech[dg_arr_sym] = fmt_arr_func(dg_arr)
 
         else:
             if isinstance(stress_arr, np.ma.core.MaskedArray):
@@ -203,8 +213,8 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, 
                                '`vel_grad`')
                         raise ValueError(msg)
 
-                bc_mech[dg_arr_sym] = format_1D_masked_array(dg_arr.flat)
-                bc_mech[stress_arr_sym] = format_1D_masked_array(stress_arr.flat)
+                bc_mech[dg_arr_sym] = fmt_arr_func(dg_arr)
+                bc_mech[stress_arr_sym] = fmt_arr_func(stress_arr)
 
             else:
                 if dg_arr is not None:
@@ -212,7 +222,7 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, 
                            f'must be passed as a masked array.')
                     raise ValueError(msg)
 
-                bc_mech[stress_arr_sym] = format_1D_masked_array(stress_arr.flat)
+                bc_mech[stress_arr_sym] = fmt_arr_func(stress_arr)
 
         if rot is not None:
             rot = np.array(rot)
@@ -246,7 +256,8 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None, 
     dir_path = Path(dir_path).resolve()
     load_path = dir_path.joinpath(name)
     yaml = YAML()
-    yaml.dump(load_data, load_path)
+    with load_path.open("wt", newline="\n") as fp:
+        yaml.dump(load_data, fp)
 
     return load_path
 
@@ -376,7 +387,8 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     dir_path = Path(dir_path).resolve()
     mat_path = dir_path.joinpath(name)
     yaml = YAML()
-    yaml.dump(mat_data_fmt, mat_path)
+    with mat_path.open("wt", newline="\n") as fp:
+        yaml.dump(mat_data_fmt, fp)
 
     return mat_path
 
