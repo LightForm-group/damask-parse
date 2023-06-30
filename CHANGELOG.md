@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.23] - 2023.06.30
+
+### Fixed
+
+- Various fixes to `utils.generate_viz` to help with its use within MatFlow.
+
 ## [0.2.22] - 2023.06.29
 
 ### Added
