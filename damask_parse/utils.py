@@ -1921,4 +1921,3 @@ def generate_viz(hdf5_path, viz_spec, parsed_outs):
 
                     # result.save_VTK(output=outputs) # v3 alpha 3?
                     result.export_VTK(output=outputs) # known: v3 alpha 7
-    
