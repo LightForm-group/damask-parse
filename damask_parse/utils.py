@@ -1767,7 +1767,6 @@ def spread_orientations(volume_element, phase_names, sigmas):
         # each identified constituent will be split into one or more constituents, corresponding
         # to the number of assigned voxels:
         for const_idx_i in const_idx:
-
             base_ori = volume_element["orientations"]["quaternions"][
                 volume_element["constituent_orientation_idx"][const_idx_i]
             ]
@@ -1778,9 +1777,16 @@ def spread_orientations(volume_element, phase_names, sigmas):
             num_elems = len(elem_idx[0])
 
             # generate a set of orientations that have a defined spread:
-            spread_oris = Rotation.from_spherical_component(
-                base_ori_dmsk, sigma=sigma, degrees=True, N=num_elems
-            )
+            try:
+                # known: v3 alpha 7
+                spread_oris = Rotation.from_spherical_component(
+                    base_ori_dmsk, sigma=sigma, degrees=True, shape=num_elems
+                )
+            except TypeError:
+                # known: v3 alpha 3
+                spread_oris = Rotation.from_spherical_component(
+                    base_ori_dmsk, sigma=sigma, degrees=True, N=num_elems
+                )
 
             cur_num_consts = volume_element["constituent_material_idx"].shape[0]
             cur_num_oris = volume_element["orientations"]["quaternions"].shape[0]
