@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.2.24] - 2023.12.13
+
+### Fixed
+
+- Update `utils.spread_orientations` to work with 3.0.0-alpha7 
+
 ## [0.2.23] - 2023.06.30
 
 ### Fixed
