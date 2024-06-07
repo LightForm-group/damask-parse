@@ -678,10 +678,10 @@ def parse_inc_specs(inc_specs, incs_in_file):
 def parse_inc_specs_using_result_obj(inc_specs, sim_data):
     """Parse increment spec using the Result object for validation."""
 
-    inc_prefix = 'increment_'
-    incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
+    # inc_prefix = 'increment_'
+    # incs_in_file = [int(inc[len(inc_prefix):]) for inc in sim_data.increments]
 
-    return parse_inc_specs(inc_specs, incs_in_file)
+    return parse_inc_specs(inc_specs, sim_data.increments)
 
 
 def apply_transforms(data, transforms, single_inc):

@@ -1,5 +1,6 @@
 """`damask_parse.writers.py`"""
 
+import sys
 import copy
 from pathlib import Path
 from collections import OrderedDict
@@ -58,7 +59,7 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     of the generated file.
 
     """
-    from damask import Grid
+    from damask import GeomGrid
 
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
@@ -72,8 +73,8 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     dir_path = Path(dir_path).resolve()
     geom_path = dir_path.joinpath(name)
 
-    ve_grid = Grid(material=element_material_idx, size=ve_size,
-                   origin=ve_origin)
+    ve_grid = GeomGrid(material=element_material_idx, size=ve_size,
+                       origin=ve_origin)
     ve_grid.save(geom_path)
 
     return geom_path
@@ -415,6 +416,7 @@ def write_numerics(dir_path, numerics, name='numerics.yaml'):
     dir_path = Path(dir_path).resolve()
     numerics_path = dir_path.joinpath(name)
     yaml = YAML()
+    yaml.width = sys.maxsize
     yaml.dump(numerics, numerics_path)
 
     return numerics_path

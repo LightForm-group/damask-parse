@@ -167,9 +167,9 @@ def read_geom(geom_path):
                 volume element.
 
     """
-    from damask import Grid
+    from damask import GeomGrid
 
-    ve_grid = Grid.load(geom_path)
+    ve_grid = GeomGrid.load(geom_path)
 
     geometry = {
         'grid_size': ve_grid.cells,
@@ -426,8 +426,8 @@ def read_HDF5_file(
     # Load in grain mapping if required
     if grain_data or (field_data and (
             'grain' in (spec['field_name'] for spec in field_data))):
-        from damask import Grid
-        ve = Grid.load(geom_path)
+        from damask import GeomGrid
+        ve = GeomGrid.load(geom_path)
         grains = ve.material
 
     for op in operations or []:

@@ -507,9 +507,9 @@ class ParticleRVE:
         particle_distributions : list of (dict or ParticleDistribution)
 
         """
-        from damask import Grid
+        from damask import GeomGrid
 
-        grid_obj = Grid.from_Voronoi_tessellation(cells, size, seeds)
+        grid_obj = GeomGrid.from_Voronoi_tessellation(cells, size, seeds)
 
         return cls(
             size=size,
@@ -619,8 +619,8 @@ class ParticleRVE:
         return centre
 
     def _generate_damask_grid_obj(self):
-        from damask import Grid
-        grid_obj = Grid(material=self._material, size=self.size)
+        from damask import GeomGrid
+        grid_obj = GeomGrid(material=self._material, size=self.size)
         return grid_obj
 
     def _add_particle(self, particle, dist_label=None):
