@@ -167,9 +167,9 @@ def read_geom(geom_path):
                 volume element.
 
     """
-    from damask import Grid
+    from damask import GeomGrid
 
-    ve_grid = Grid.load(geom_path)
+    ve_grid = GeomGrid.load(geom_path)
 
     geometry = {
         'grid_size': ve_grid.cells,
