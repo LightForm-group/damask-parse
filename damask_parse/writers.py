@@ -58,7 +58,10 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     of the generated file.
 
     """
-    from damask import Grid
+    try:
+        from damask import GeomGrid as grid_cls
+    except ImportError:
+        from damask import Grid as grid_cls
 
     volume_element = validate_volume_element(volume_element)
     element_material_idx = volume_element['element_material_idx']
@@ -72,7 +75,7 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     dir_path = Path(dir_path).resolve()
     geom_path = dir_path.joinpath(name)
 
-    ve_grid = Grid(material=element_material_idx, size=ve_size,
+    ve_grid = grid_cls(material=element_material_idx, size=ve_size,
                    origin=ve_origin)
     ve_grid.save(geom_path)
 
