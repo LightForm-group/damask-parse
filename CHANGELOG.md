@@ -1,4 +1,16 @@
 
+<a name="v0.2.26"></a>
+## [v0.2.26](https://github.com/LightForm-group/damask-parse/compare/v0.2.25...v0.2.26) - 2024.10.16
+
+### 🐛 Bug Fixes
+
+* release GA workflow
+
+### 👷 Build changes
+
+* merge branch 'master' of https://github.com/LightForm-group/damask-parse
+
+
 <a name="v0.2.25"></a>
 ## [v0.2.25](https://github.com/LightForm-group/damask-parse/compare/v0.2.24...v0.2.25) - 2024.10.16
 
