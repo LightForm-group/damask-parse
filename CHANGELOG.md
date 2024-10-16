@@ -1,4 +1,12 @@
 
+<a name="v0.2.29"></a>
+## [v0.2.29](https://github.com/LightForm-group/damask-parse/compare/v0.2.28...v0.2.29) - 2024.10.16
+
+### 🐛 Bug Fixes
+
+* specify version files to update in commitizen pyproject.toml block
+
+
 <a name="v0.2.28"></a>
 ## [v0.2.28](https://github.com/LightForm-group/damask-parse/compare/v0.2.27...v0.2.28) - 2024.10.16
 
