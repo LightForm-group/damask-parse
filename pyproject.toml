@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "damask-parse"
-version = "0.2.24"
+version = "0.2.28"
 description = "Input file writers and output file readers for the crystal plasticity code DAMASK."
 authors = [
     "Adam Plowman <adam.plowman@manchester.ac.uk>",
@@ -41,6 +41,10 @@ ipykernel = "^6.29.5"
 name = "cz_conventional_commits"
 version = "0.2.28"
 tag_format = "v$version"
+version_files = [ 
+    "pyproject.toml:version",
+    "damask_parse/_version.py"
+]
 
 [build-system]
 requires = ["poetry-core"]

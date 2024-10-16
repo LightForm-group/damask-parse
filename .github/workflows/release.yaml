@@ -78,9 +78,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }} # otherwise we get the ref when the workflow started (missing above commit)
-          fetch-depth: 0 # get all history and tags
-
-      - run: git log --oneline
 
       - uses: actions/setup-python@v5
         with:
