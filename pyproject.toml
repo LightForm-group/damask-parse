@@ -10,6 +10,11 @@ authors = [
 ]
 license = "MPL 2.0"
 readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.13"
