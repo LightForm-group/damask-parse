@@ -1,0 +1,122 @@
+name: release
+
+env:
+  PYTHON_VERSION_BUMP: "3.12"
+  PYTHON_VERSION_RELEASE: "3.12"
+  POETRY_VERSION: "1.8"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bump-version:
+    if: github.ref == 'refs/heads/master' # only release from master
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag_name: ${{ steps.get_new_tag.outputs.new_tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # get all history and tags
+
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_BUMP }}
+
+      - name: Get git-chglog executable
+        run: |
+          wget https://github.com/git-chglog/git-chglog/releases/download/v0.15.0/git-chglog_0.15.0_linux_amd64.tar.gz
+          tar --extract --file git-chglog_0.15.0_linux_amd64.tar.gz git-chglog
+
+      - name: Install commitizen
+        run: pip install commitizen
+
+      - name: Get current tag
+        run: |
+          CUR_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+          echo "cur_tag=$CUR_TAG" >> $GITHUB_ENV
+
+      - name: Commitizen bump # Bump version strings and add a new tag; commit
+        run: cz bump
+
+      - name: Get new tag
+        id: get_new_tag
+        run: |
+          NEW_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+          echo "new_tag=$NEW_TAG" >> $GITHUB_ENV
+          echo "::set-output name=new_tag_name::$NEW_TAG"
+
+      - name: Generate CHANGELOG
+        run: |
+          ./git-chglog --output CHANGELOG.md
+          git add CHANGELOG.md
+          git tag -d ${{ env.new_tag }}
+          git commit --amend --no-edit
+          git tag ${{ env.new_tag }}
+
+      - name: Push changes
+        run: git push && git push origin ${{ env.new_tag }}
+
+      - name: Generate incremental CHANGELOG for GitHub release body
+        run: |
+          ./git-chglog --template .chglog/RELEASE.tpl.md --output CHANGELOG_increment.md ${{ env.new_tag }}
+          cat CHANGELOG_increment.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CHANGELOG_increment
+          path: CHANGELOG_increment.md
+
+  release-github-PyPI:
+    needs: [bump-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }} # otherwise we get the ref when the workflow started (missing above commit)
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION_RELEASE }}
+
+      - name: Install poetry
+        run: python -m pip install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Configure poetry
+        run: |
+          poetry config virtualenvs.in-project true
+
+      - name: Cache the virtualenv
+        uses: actions/cache@v4
+        with:
+          path: ./.venv
+          key: venv-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Build (for PyPI)
+        run: |
+          poetry build
+
+      - run: mkdir release-artifacts
+
+      - uses: actions/download-artifact@v2
+        id: download_executables
+        with:
+          path: release-artifacts
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-artifacts/CHANGELOG_increment/CHANGELOG_increment.md
+          tag_name: ${{ needs.bump-version.outputs.new_tag_name }}
+
+      - name: Publish to PyPI
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.DAMASK_PARSE_PYPI }}
+          poetry publish
