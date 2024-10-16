@@ -1,4 +1,16 @@
 
+<a name="v0.2.28"></a>
+## [v0.2.28](https://github.com/LightForm-group/damask-parse/compare/v0.2.27...v0.2.28) - 2024.10.16
+
+### 🐛 Bug Fixes
+
+* try to get poetry to build the correct commit
+
+### 👷 Build changes
+
+* merge branch 'master' of https://github.com/LightForm-group/damask-parse
+
+
 <a name="v0.2.27"></a>
 ## [v0.2.27](https://github.com/LightForm-group/damask-parse/compare/v0.2.26...v0.2.27) - 2024.10.16
 

@@ -39,7 +39,7 @@ ipykernel = "^6.29.5"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.2.27"
+version = "0.2.28"
 tag_format = "v$version"
 
 [build-system]
