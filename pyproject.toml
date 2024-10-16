@@ -28,7 +28,7 @@ scipy = [
 ]
 pandas = "^2.0.3"
 h5py = "^3.11.0"
-damask = "3.0.0a3.post2 || 3.0.0a7.post0 || 3.0.0"
+damask = "^3.0.0"
 "ruamel.yaml" = "^0.18.6"
 
 [tool.poetry.group.dev.dependencies]
