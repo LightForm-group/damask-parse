@@ -1,4 +1,12 @@
 
+<a name="v0.2.30"></a>
+## [v0.2.30](https://github.com/LightForm-group/damask-parse/compare/v0.2.29...v0.2.30) - 2024.10.30
+
+### 🐛 Bug Fixes
+
+* support new and old DAMASK Grid formats for HDF5
+
+
 <a name="v0.2.29"></a>
 ## [v0.2.29](https://github.com/LightForm-group/damask-parse/compare/v0.2.28...v0.2.29) - 2024.10.16
 
