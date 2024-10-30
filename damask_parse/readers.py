@@ -429,8 +429,11 @@ def read_HDF5_file(
     # Load in grain mapping if required
     if grain_data or (field_data and (
             'grain' in (spec['field_name'] for spec in field_data))):
-        from damask import Grid
-        ve = Grid.load(geom_path)
+        try:
+            from damask import GeomGrid as grid_cls
+        except ImportError:
+            from damask import Grid as grid_cls
+        ve = grid_cls.load(geom_path)
         grains = ve.material
 
     for op in operations or []:
