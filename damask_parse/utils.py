@@ -1189,7 +1189,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
             'constituent_orientation_idx',    # default value can be set (sometimes)
         ]
 
-    allowed += ['size', 'origin']
+    allowed += ['size', 'origin', 'initial_conditions']
 
     missing = set(req) - set(volume_element)
     if missing:
