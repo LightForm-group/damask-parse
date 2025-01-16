@@ -1165,6 +1165,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         'material_homog',
         'element_material_idx',
         'grid_size',
+        'initial_conditions',
     ]
 
     if ignore_missing_elements:
