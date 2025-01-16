@@ -1247,6 +1247,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         'constituent_orientation_idx',
         'element_material_idx',
         'grid_size',
+        'initial_conditions',
     ]
     str_arrs = [
         'constituent_phase_label',
