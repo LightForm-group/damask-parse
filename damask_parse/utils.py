@@ -1165,7 +1165,6 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         'material_homog',
         'element_material_idx',
         'grid_size',
-        'initial_conditions',
     ]
 
     if ignore_missing_elements:
@@ -1190,7 +1189,7 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
             'constituent_orientation_idx',    # default value can be set (sometimes)
         ]
 
-    allowed += ['size', 'origin']
+    allowed += ['size', 'origin', 'initial_conditions']
 
     missing = set(req) - set(volume_element)
     if missing:
@@ -1247,7 +1246,6 @@ def validate_volume_element(volume_element, phases=None, homog_schemes=None):
         'constituent_orientation_idx',
         'element_material_idx',
         'grid_size',
-        'initial_conditions',
     ]
     str_arrs = [
         'constituent_phase_label',
