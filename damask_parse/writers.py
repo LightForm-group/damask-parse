@@ -75,6 +75,10 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
 
     ve_grid = GeomGrid(material=element_material_idx, size=ve_size,
                        origin=ve_origin)
+
+    if 'initial_conditions' in volume_element:
+        ve_grid.initial_conditions = volume_element['initial_conditions']
+
     ve_grid.save(geom_path)
 
     return geom_path
