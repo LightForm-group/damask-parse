@@ -1,4 +1,12 @@
 
+<a name="v0.3.0"></a>
+## [v0.3.0](https://github.com/LightForm-group/damask-parse/compare/v0.2.30...v0.3.0) - 2025.10.28
+
+### ✨ Features
+
+* add initial conditions to `write_geom`
+
+
 <a name="v0.2.30"></a>
 ## [v0.2.30](https://github.com/LightForm-group/damask-parse/compare/v0.2.29...v0.2.30) - 2024.10.30
 
