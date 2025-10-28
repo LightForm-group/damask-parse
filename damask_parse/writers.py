@@ -1,17 +1,14 @@
 """`damask_parse.writers.py`"""
 
-import copy
 from pathlib import Path
-from collections import OrderedDict
+from typing import Any
 
 import numpy as np
 from ruamel.yaml import YAML
 
 from damask_parse.utils import (
     format_2D_masked_array,
-    zeropad,
     format_1D_masked_array,
-    align_orientations,
     get_volume_element_materials,
     validate_volume_element,
     prepare_material_yaml_data,
@@ -26,7 +23,12 @@ __all__ = [
 ]
 
 
-def write_geom(dir_path, volume_element, name='geom.vtr'):
+def write_geom(
+    dir_path,
+    volume_element,
+    initial_conditions: dict[str, Any] | None = None,
+    name: str = "geom.vtr",
+):
     """Write the geometry file for a spectral DAMASK simulation.
 
     Parameters
@@ -44,6 +46,9 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
                 Volume element size. By default set to unit size: [1.0, 1.0, 1.0].
             origin : list of length three, optional
                 Volume element origin. By default: [0, 0, 0].
+    initial_conditions:
+        Mapping between string keys are values for initial conditions across the volume
+        element.
     name : str, optional
         Name of geometry file to write. By default, set to "geom.vtr".
 
@@ -76,7 +81,7 @@ def write_geom(dir_path, volume_element, name='geom.vtr'):
     geom_path = dir_path.joinpath(name)
 
     ve_grid = grid_cls(material=element_material_idx, size=ve_size,
-                   origin=ve_origin)
+                   origin=ve_origin, initial_conditions=initial_conditions)
     ve_grid.save(geom_path)
 
     return geom_path
