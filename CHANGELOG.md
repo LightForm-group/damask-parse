@@ -1,4 +1,16 @@
 
+<a name="v0.4.0"></a>
+## [v0.4.0](https://github.com/LightForm-group/damask-parse/compare/v0.3.0...v0.4.0) - 2025.11.10
+
+### ✨ Features
+
+* support Python 3.13
+
+### 👷 Build changes
+
+* **deps-dev:** bump jinja2 from 3.1.4 to 3.1.5
+
+
 <a name="v0.3.0"></a>
 ## [v0.3.0](https://github.com/LightForm-group/damask-parse/compare/v0.2.30...v0.3.0) - 2025.10.28
 
