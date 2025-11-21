@@ -1,4 +1,12 @@
 
+<a name="v0.4.2"></a>
+## [v0.4.2](https://github.com/LightForm-group/damask-parse/compare/v0.4.1...v0.4.2) - 2025.11.21
+
+### 🐛 Bug Fixes
+
+* type error on py3.9
+
+
 <a name="v0.4.1"></a>
 ## [v0.4.1](https://github.com/LightForm-group/damask-parse/compare/v0.4.0...v0.4.1) - 2025.11.10
 
