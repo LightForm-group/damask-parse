@@ -492,7 +492,7 @@ def read_HDF5_file(
             sim_data, field_name, spec.get('increments'), transforms=transforms
         )
         # No increments returned, continue to next
-        if not increments:
+        if not increments.size:
             continue
 
         # Get out_name or construct out_name
@@ -528,7 +528,7 @@ def read_HDF5_file(
             transforms=transforms
         )
         # No increments returned, continue to next
-        if not increments:
+        if not increments.size:
             continue
 
         # Get out_name or construct out_name
@@ -581,7 +581,7 @@ def read_HDF5_file(
                 sim_data, field_name, spec.get('increments')
             )
             # No increments returned, continue to next
-            if not increments:
+            if not increments.size:
                 continue
             field_meta = {'increments': increments}
 
@@ -611,7 +611,7 @@ def read_HDF5_file(
                 sim_data, field_name, spec.get('increments')
             )
             # No increments returned, continue to next
-            if not increments:
+            if not increments.size:
                 continue
 
         # grain average

@@ -801,7 +801,7 @@ def get_vol_data(sim_data, field_name, increments, transforms=None):
     if field_name == 'O':
         vol_data = process_damask_orientatons(vol_data)
 
-    return vol_data, incs_valid, phase_names
+    return vol_data, np.asarray(incs_valid), phase_names
 
 
 def get_phase_data(sim_data, field_name, phase_name, increments,
@@ -832,7 +832,7 @@ def get_phase_data(sim_data, field_name, phase_name, increments,
     if field_name == 'O':
         phase_data = process_damask_orientatons(phase_data)
 
-    return phase_data, incs_valid
+    return phase_data, np.asarray(incs_valid)
 
 
 def get_field_data(sim_data, field_name, increments):
@@ -888,7 +888,7 @@ def get_field_data(sim_data, field_name, increments):
     if field_name == 'O':
         field_data = process_damask_orientatons(field_data)
 
-    return field_data, incs_valid
+    return field_data, np.asarray(incs_valid)
 
 
 def apply_grain_average(field_data, grains, is_oris=False):
