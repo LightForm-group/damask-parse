@@ -1,4 +1,12 @@
 
+<a name="v0.5.0"></a>
+## [v0.5.0](https://github.com/LightForm-group/damask-parse/compare/v0.4.2...v0.5.0) - 2025.11.22
+
+### ✨ Features
+
+* return increments in `get_volume/phase/field_data` as a numpy array
+
+
 <a name="v0.4.2"></a>
 ## [v0.4.2](https://github.com/LightForm-group/damask-parse/compare/v0.4.1...v0.4.2) - 2025.11.21
 
