@@ -1,4 +1,12 @@
 
+<a name="v0.5.1"></a>
+## [v0.5.1](https://github.com/LightForm-group/damask-parse/compare/v0.5.0...v0.5.1) - 2025.11.23
+
+### 🐛 Bug Fixes
+
+* parsing stdout when cut back occurs
+
+
 <a name="v0.5.0"></a>
 ## [v0.5.0](https://github.com/LightForm-group/damask-parse/compare/v0.4.2...v0.5.0) - 2025.11.22
 
