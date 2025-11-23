@@ -1,5 +1,6 @@
 """`damask_parse.readers.py`"""
 
+from collections import defaultdict
 from pathlib import Path
 
 import re
@@ -190,11 +191,27 @@ def read_geom(geom_path):
 def read_spectral_stdout(path, encoding="utf8"):
     path = Path(path)
     inc_split_str = r'\s#{75}'
+    inc_pattern = re.compile(r"Time.*Increment\s+(\d+)\s*\/\s*\d+")
 
     with path.open("r", encoding=encoding) as handle:
         lines = handle.read()
 
-        inc_split = re.split(inc_split_str, lines)
+        cut_back_split = re.split(inc_split_str, lines)[1:]
+
+        # we split on the "cut back" delimiter really, not the increment delimiter, so 
+        # join together items that are actually the same increment:
+        # extract increment indices:
+        inc_indices = []
+        for line in cut_back_split:
+            m = inc_pattern.search(line)
+            if m:
+                inc_indices.append(int(m.group(1)))
+        
+        # group by the same increment index:
+        groups = defaultdict(str)
+        for idx, s in zip(inc_indices, cut_back_split):
+            groups[idx] += s
+        inc_split = list(groups.values())
 
         dg_arr = []
         pk_arr = []
@@ -209,7 +226,7 @@ def read_spectral_stdout(path, encoding="utf8"):
         converge_errors = None
         warnings = []
 
-        for idx, i in enumerate(inc_split[1:]):
+        for idx, i in enumerate(inc_split):
 
             parsed_inc = parse_increment(i)
             if parsed_inc['converged']:
