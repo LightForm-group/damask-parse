@@ -29,43 +29,45 @@ __all__ = [
 
 def parse_increment_iteration(inc_iter_str):
 
-    float_pat = r'-?\d+\.\d+'
-    sci_float_pat = r'-?\d+\.\d+E[+|-]\d+'
+    try:
+        float_pat = r'-?\d+\.\d+'
+        sci_float_pat = r'-?\d+\.\d+E[+|-]\d+'
 
-    dg_pat = r'deformation gradient aim\s+=\n(\s+(?:(?:' + float_pat + r'\s+){3}){3})'
-    dg_match = re.search(dg_pat, inc_iter_str)
-    dg_str = dg_match.group(1)
-    dg = np.array([float(i) for i in dg_str.split()]).reshape((3, 3))
+        dg_pat = r'deformation gradient aim\s+=\n(\s+(?:(?:' + float_pat + r'\s+){3}){3})'
+        dg_match = re.search(dg_pat, inc_iter_str)
+        dg_str = dg_match.group(1)
+        dg = np.array([float(i) for i in dg_str.split()]).reshape((3, 3))
 
-    pk_pat = r'Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:' + \
-        float_pat + r'\s+){3}){3})'
-    pk_match = re.search(pk_pat, inc_iter_str)
-    pk_str = pk_match.group(1)
-    pk = np.array([float(i) for i in pk_str.split()]).reshape((3, 3))
+        pk_pat = r'Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:' + \
+            float_pat + r'\s+){3}){3})'
+        pk_match = re.search(pk_pat, inc_iter_str)
+        pk_str = pk_match.group(1)
+        pk = np.array([float(i) for i in pk_str.split()]).reshape((3, 3))
 
-    err_pat = r'error (.*)\s+=\s+(-?\d+\.\d+)\s\((' + sci_float_pat + \
-        r')\s(.*),\s+tol\s+=\s+(' + sci_float_pat + r')\)'
-    err_matches = re.findall(err_pat, inc_iter_str)
-    converge_err = {}
-    for i in err_matches:
-        err_key = 'error_' + i[0].strip().replace(' ', '_')
-        converge_err.update({
-            err_key: {
-                'value': float(i[2]),
-                'unit': i[3].strip(),
-                'tol': float(i[4]),
-                'relative': float(i[1]),
-            }
-        })
+        err_pat = r'error (.*)\s+=\s+(-?\d+\.\d+)\s\((' + sci_float_pat + \
+            r')\s(.*),\s+tol\s+=\s+(' + sci_float_pat + r')\)'
+        err_matches = re.findall(err_pat, inc_iter_str)
+        converge_err = {}
+        for i in err_matches:
+            err_key = 'error_' + i[0].strip().replace(' ', '_')
+            converge_err.update({
+                err_key: {
+                    'value': float(i[2]),
+                    'unit': i[3].strip(),
+                    'tol': float(i[4]),
+                    'relative': float(i[1]),
+                }
+            })
 
-    inc_iter = {
-        'deformation_gradient_aim': dg,
-        'piola_kirchhoff_stress': pk,
-        **converge_err,
-    }
+        inc_iter = {
+            'deformation_gradient_aim': dg,
+            'piola_kirchhoff_stress': pk,
+            **converge_err,
+        }
 
-    return inc_iter
-
+        return inc_iter
+    except:
+        return None
 
 def parse_increment(inc_str):
 
@@ -108,19 +110,22 @@ def parse_increment(inc_str):
 
         inc_iter_i = parse_increment_iteration(i)
 
-        if idx == 0:
-            err_keys = [j for j in inc_iter_i.keys() if j.startswith('error_')]
-            converge_errors = dict(
-                zip(err_keys, [{'value': [], 'tol': [], 'relative': []}
-                               for _ in err_keys])
-            )
+        if inc_iter_i == None:
+            pass
+        else:
+            if idx == 0:
+                err_keys = [j for j in inc_iter_i.keys() if j.startswith('error_')]
+                converge_errors = dict(
+                    zip(err_keys, [{'value': [], 'tol': [], 'relative': []}
+                                for _ in err_keys])
+                )
 
-        dg_arr.append(inc_iter_i['deformation_gradient_aim'])
-        pk_arr.append(inc_iter_i['piola_kirchhoff_stress'])
+            dg_arr.append(inc_iter_i['deformation_gradient_aim'])
+            pk_arr.append(inc_iter_i['piola_kirchhoff_stress'])
 
-        for j in err_keys:
-            for k in ['value', 'tol', 'relative']:
-                converge_errors[j][k].append(inc_iter_i[j][k])
+            for j in err_keys:
+                for k in ['value', 'tol', 'relative']:
+                    converge_errors[j][k].append(inc_iter_i[j][k])
 
     dg_arr = np.array(dg_arr)
     pk_arr = np.array(pk_arr)
