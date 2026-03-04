@@ -166,6 +166,9 @@ def read_geom(geom_path):
             meta : dict
                 Any meta information associated with the generation of this
                 volume element.
+            initial_conditions:
+                Mapping between string keys are values for initial conditions
+                across the volume element.
 
     """
     try:
@@ -179,6 +182,9 @@ def read_geom(geom_path):
         'grid_size': ve_grid.cells,
         'size': ve_grid.size,
         'origin': ve_grid.origin,
+        'initial_conditions': {
+            'T': ve_grid.initial_conditions['T']
+        },
         'element_material_idx': ve_grid.material,
         'meta': {
             'comments': ve_grid.comments,
