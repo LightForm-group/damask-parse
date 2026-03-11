@@ -182,9 +182,7 @@ def read_geom(geom_path):
         'grid_size': ve_grid.cells,
         'size': ve_grid.size,
         'origin': ve_grid.origin,
-        'initial_conditions': {
-            'T': ve_grid.initial_conditions['T']
-        },
+        'initial_conditions': ve_grid.initial_conditions,
         'element_material_idx': ve_grid.material,
         'meta': {
             'comments': ve_grid.comments,
