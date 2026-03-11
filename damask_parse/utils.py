@@ -1844,8 +1844,13 @@ def working_directory(path):
     finally:
         os.chdir(prev_cwd)
 
-def visualise_static_outpurts(outputs, result, parsed_outs):
-    """Create separate VTK file for grain and phase maps."""
+def visualise_static_outpurts(outputs, result, parsed_outs, parallel=True):
+    """Create separate VTK file for grain and phase maps.
+        
+    Note: `parallel` should be set to False on Windows. Exceptions will be raised (
+    `OSError: [WinError 6] The handle is invalid`) otherwise.
+
+    """
 
     static_outputs = ['grain', 'phase']
 
@@ -1864,11 +1869,17 @@ def visualise_static_outpurts(outputs, result, parsed_outs):
                     # known: v3 alpha 7
                     v.set(data=dat_array.flatten(order='F'), label=static_output)
 
-            v.save('static_outputs')
+            v.save('static_outputs', parallel=parallel)
 
     return outputs
 
-def generate_viz(hdf5_path, viz_spec, parsed_outs):
+def generate_viz(hdf5_path, viz_spec, parsed_outs, parallel=True):
+    """Generate VTK files from DAMASK's HDF5 result file.
+    
+    Note: `parallel` should be set to False on Windows. Exceptions will be raised (
+    `OSError: [WinError 6] The handle is invalid`) otherwise.
+    
+    """
     if viz_spec is not None:
 
         from damask import Result
@@ -1923,7 +1934,9 @@ def generate_viz(hdf5_path, viz_spec, parsed_outs):
                     # all outputs if not specified:
                     outputs = viz_dict.get('fields', '*')
 
-                    outputs = visualise_static_outpurts(outputs, result, parsed_outs)
+                    outputs = visualise_static_outpurts(
+                        outputs, result, parsed_outs, parallel=parallel
+                    )
 
                     # result.save_VTK(output=outputs) # v3 alpha 3?
-                    result.export_VTK(output=outputs) # known: v3 alpha 7
+                    result.export_VTK(output=outputs, parallel=parallel) # known: v3 alpha 7
