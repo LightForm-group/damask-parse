@@ -32,37 +32,44 @@ def parse_increment_iteration(inc_iter_str):
     float_pat = r'-?\d+\.\d+'
     sci_float_pat = r'-?\d+\.\d+E[+|-]\d+'
 
-    dg_pat = r'deformation gradient aim\s+=\n(\s+(?:(?:' + float_pat + r'\s+){3}){3})'
-    dg_match = re.search(dg_pat, inc_iter_str)
-    dg_str = dg_match.group(1)
-    dg = np.array([float(i) for i in dg_str.split()]).reshape((3, 3))
+    try:
+        dg_pat = r'deformation gradient aim\s+=\n(\s+(?:(?:' + float_pat + r'\s+){3}){3})'
+        dg_match = re.search(dg_pat, inc_iter_str)
+        dg_str = dg_match.group(1)
+        dg = np.array([float(i) for i in dg_str.split()]).reshape((3, 3))
 
-    pk_pat = r'Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:' + \
-        float_pat + r'\s+){3}){3})'
-    pk_match = re.search(pk_pat, inc_iter_str)
-    pk_str = pk_match.group(1)
-    pk = np.array([float(i) for i in pk_str.split()]).reshape((3, 3))
+        pk_pat = r'Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:' + \
+            float_pat + r'\s+){3}){3})'
+        pk_match = re.search(pk_pat, inc_iter_str)
+        pk_str = pk_match.group(1)
+        pk = np.array([float(i) for i in pk_str.split()]).reshape((3, 3))
 
-    err_pat = r'error (.*)\s+=\s+(-?\d+\.\d+)\s\((' + sci_float_pat + \
-        r')\s(.*),\s+tol\s+=\s+(' + sci_float_pat + r')\)'
-    err_matches = re.findall(err_pat, inc_iter_str)
-    converge_err = {}
-    for i in err_matches:
-        err_key = 'error_' + i[0].strip().replace(' ', '_')
-        converge_err.update({
-            err_key: {
-                'value': float(i[2]),
-                'unit': i[3].strip(),
-                'tol': float(i[4]),
-                'relative': float(i[1]),
-            }
-        })
+        err_pat = r'error (.*)\s+=\s+(-?\d+\.\d+)\s\((' + sci_float_pat + \
+            r')\s(.*),\s+tol\s+=\s+(' + sci_float_pat + r')\)'
+        err_matches = re.findall(err_pat, inc_iter_str)
+        converge_err = {}
+        for i in err_matches:
+            err_key = 'error_' + i[0].strip().replace(' ', '_')
+            converge_err.update({
+                err_key: {
+                    'value': float(i[2]),
+                    'unit': i[3].strip(),
+                    'tol': float(i[4]),
+                    'relative': float(i[1]),
+                }
+            })
 
-    inc_iter = {
-        'deformation_gradient_aim': dg,
-        'piola_kirchhoff_stress': pk,
-        **converge_err,
-    }
+        inc_iter = {
+            'deformation_gradient_aim': dg,
+            'piola_kirchhoff_stress': pk,
+            **converge_err,
+        }
+    except AttributeError:
+        temp_pat = (r'thermal conduction converged\s\.+\n\n'
+                  r'\sMinimum\|Maximum\|Delta Temperature \/ K = ((' + float_pat + r'\s*){3})')
+        temp_match = re.search(temp_pat, inc_iter_str)
+        temp = np.array([float(i) for i in temp_match.group(1).split()])
+        inc_iter = {'temperature': temp}
 
     return inc_iter
 
@@ -103,6 +110,7 @@ def parse_increment(inc_str):
     converge_errors = None
     err_keys = None
     num_iters = len(inc_iter_split) - 1
+    temp_arr = []
 
     for idx, i in enumerate(inc_iter_split[:-1]):
 
@@ -115,12 +123,14 @@ def parse_increment(inc_str):
                                for _ in err_keys])
             )
 
-        dg_arr.append(inc_iter_i['deformation_gradient_aim'])
-        pk_arr.append(inc_iter_i['piola_kirchhoff_stress'])
-
-        for j in err_keys:
-            for k in ['value', 'tol', 'relative']:
-                converge_errors[j][k].append(inc_iter_i[j][k])
+        try:
+            dg_arr.append(inc_iter_i['deformation_gradient_aim'])
+            pk_arr.append(inc_iter_i['piola_kirchhoff_stress'])
+            for j in err_keys:
+                for k in ['value', 'tol', 'relative']:
+                    converge_errors[j][k].append(inc_iter_i[j][k])
+        except KeyError:
+            temp_arr.append(inc_iter_i['temperature'])
 
     dg_arr = np.array(dg_arr)
     pk_arr = np.array(pk_arr)
@@ -139,6 +149,9 @@ def parse_increment(inc_str):
         'num_iters': num_iters,
         **converge_errors,
     }
+
+    if temp_arr:
+        parsed_inc['temperature'] = temp_arr
 
     return parsed_inc
 
@@ -225,6 +238,7 @@ def read_spectral_stdout(path, encoding="utf8"):
         err_keys = None
         converge_errors = None
         warnings = []
+        temp_arr = []
 
         for idx, i in enumerate(inc_split):
 
@@ -240,6 +254,8 @@ def read_spectral_stdout(path, encoding="utf8"):
                     )
                 dg_arr.extend(parsed_inc.pop('deformation_gradient_aim'))
                 pk_arr.extend(parsed_inc.pop('piola_kirchhoff_stress'))
+                if "temperature" in parsed_inc:
+                    temp_arr.extend(parsed_inc.pop('temperature'))
                 for j in err_keys:
                     for k in ['value', 'tol', 'relative']:
                         converge_errors[j][k].extend(parsed_inc[j][k])
@@ -268,6 +284,10 @@ def read_spectral_stdout(path, encoding="utf8"):
             **converge_errors,
             **inc_pos_dat
         }
+
+        if temp_arr:
+            temp_arr = np.array(temp_arr)
+            out['temperature'] = temp_arr
 
     return out
 
