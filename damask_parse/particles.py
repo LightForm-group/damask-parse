@@ -1,5 +1,5 @@
 """
-TODO: 
+TODO:
     - Rethink to/from_JSON_like
     - Ensure we can reproduce the same RVE with random_seed specification
 """
@@ -14,11 +14,18 @@ from damask_parse.utils import perpendicular_vectors
 from damask_parse.utils import get_coordinate_grid
 
 
-def generate_particle_distribution(number, major_axis_length, minor_axis_ratios=None,
-                                   major_axis_dir=None, major_plane_normal_dir=None,
-                                   margins=None, major_axis_length_stddev=None,
-                                   minor_axis_ratios_stddev=None, margins_stddev=None,
-                                   random_seed=None):
+def generate_particle_distribution(
+    number,
+    major_axis_length,
+    minor_axis_ratios=None,
+    major_axis_dir=None,
+    major_plane_normal_dir=None,
+    margins=None,
+    major_axis_length_stddev=None,
+    minor_axis_ratios_stddev=None,
+    margins_stddev=None,
+    random_seed=None,
+):
     """
     Parameters
     ----------
@@ -57,7 +64,7 @@ def generate_particle_distribution(number, major_axis_length, minor_axis_ratios=
 
     Notes
     -----
-    Distributions will be truncated to avoid negative values of `major_axis_length`, 
+    Distributions will be truncated to avoid negative values of `major_axis_length`,
     `minor_axis_ratios` and `margins`.
 
     """
@@ -81,8 +88,10 @@ def generate_particle_distribution(number, major_axis_length, minor_axis_ratios=
         margins_stddev = [0, 0, 0]
 
     if not np.isclose(np.dot(major_axis_dir, major_plane_normal_dir), 0):
-        msg = (f'`major_axis_dir` ({major_axis_dir}) and `major_plane_normal_dir` '
-               f'({major_plane_normal_dir}) must be perpendicular.')
+        msg = (
+            f"`major_axis_dir` ({major_axis_dir}) and `major_plane_normal_dir` "
+            f"({major_plane_normal_dir}) must be perpendicular."
+        )
         raise ValueError(msg)
 
     rng = np.random.default_rng(random_seed)
@@ -92,25 +101,31 @@ def generate_particle_distribution(number, major_axis_length, minor_axis_ratios=
         scale=major_axis_length_stddev,
         size=number,
     )
-    minor_axis_ratios_set = np.array([
-        rng.normal(loc=minor_axis_ratios[0],
-                   scale=minor_axis_ratios_stddev[0], size=number),
-        rng.normal(loc=minor_axis_ratios[1],
-                   scale=minor_axis_ratios_stddev[1], size=number),
-    ]).T
-    margins_set = np.array([
-        rng.normal(loc=margins[0], scale=margins_stddev[0], size=number),
-        rng.normal(loc=margins[1], scale=margins_stddev[1], size=number),
-        rng.normal(loc=margins[2], scale=margins_stddev[2], size=number),
-    ]).T
+    minor_axis_ratios_set = np.array(
+        [
+            rng.normal(
+                loc=minor_axis_ratios[0], scale=minor_axis_ratios_stddev[0], size=number
+            ),
+            rng.normal(
+                loc=minor_axis_ratios[1], scale=minor_axis_ratios_stddev[1], size=number
+            ),
+        ]
+    ).T
+    margins_set = np.array(
+        [
+            rng.normal(loc=margins[0], scale=margins_stddev[0], size=number),
+            rng.normal(loc=margins[1], scale=margins_stddev[1], size=number),
+            rng.normal(loc=margins[2], scale=margins_stddev[2], size=number),
+        ]
+    ).T
 
     particles = [
         {
-            'major_axis_length': major,
-            'minor_axis_ratios': minor,
-            'margins': marg,
-            'major_axis_dir': major_axis_dir,
-            'major_plane_normal_dir': major_plane_normal_dir,
+            "major_axis_length": major,
+            "minor_axis_ratios": minor,
+            "margins": marg,
+            "major_axis_dir": major_axis_dir,
+            "major_plane_normal_dir": major_plane_normal_dir,
         }
         for major, minor, marg in zip(
             major_axis_length_set,
@@ -124,13 +139,21 @@ def generate_particle_distribution(number, major_axis_length, minor_axis_ratios=
 
 class Particle:
 
-    def __init__(self, major_axis_length, centre=None, minor_axis_ratios=None, margins=None,
-                 major_axis_dir=None, major_plane_normal_dir=None, distribution=None,
-                 _centre_history=None):
+    def __init__(
+        self,
+        major_axis_length,
+        centre=None,
+        minor_axis_ratios=None,
+        margins=None,
+        major_axis_dir=None,
+        major_plane_normal_dir=None,
+        distribution=None,
+        _centre_history=None,
+    ):
         """
         Parameters
         ----------
-        major_axis_length : number                
+        major_axis_length : number
         centre : list of number
         minor_axis_ratios : list of number, optional
         distribution : ParticleDistribution, optional
@@ -161,13 +184,13 @@ class Particle:
 
     def to_JSON_like(self):
         dct = {
-            'major_axis_length': self.major_axis_length,
-            'minor_axis_ratios': self.minor_axis_ratios,
-            'centre': self.centre,
-            'margins': self.margins,
-            'major_axis_dir': self.major_axis_dir,
-            'major_plane_normal_dir': self.major_plane_normal_dir,
-            '_centre_history': [list(i) for i in self._centre_history],
+            "major_axis_length": self.major_axis_length,
+            "minor_axis_ratios": self.minor_axis_ratios,
+            "centre": self.centre,
+            "margins": self.margins,
+            "major_axis_dir": self.major_axis_dir,
+            "major_plane_normal_dir": self.major_plane_normal_dir,
+            "_centre_history": [list(i) for i in self._centre_history],
         }
         return dct
 
@@ -179,14 +202,18 @@ class Particle:
     def _validate(self):
         for ratio in self.minor_axis_ratios:
             if ratio > 1:
-                msg = (f'Minor axes ratios should be less than 1, but values are: '
-                       f'{self.minor_axis_ratios}')
+                msg = (
+                    f"Minor axes ratios should be less than 1, but values are: "
+                    f"{self.minor_axis_ratios}"
+                )
                 raise ValueError(msg)
 
         if not np.isclose(np.dot(self.major_axis_dir, self.major_plane_normal_dir), 0):
-            msg = (f'`major_axis_dir` ({self.major_axis_dir}) and '
-                   f'`major_plane_normal_dir` ({self.major_plane_normal_dir}) '
-                   f'must be perpendicular.')
+            msg = (
+                f"`major_axis_dir` ({self.major_axis_dir}) and "
+                f"`major_plane_normal_dir` ({self.major_plane_normal_dir}) "
+                f"must be perpendicular."
+            )
             raise ValueError(msg)
 
         self.major_axis_dir /= np.linalg.norm(self.major_axis_dir)
@@ -218,11 +245,11 @@ class Particle:
 
     @property
     def radii(self):
-        return [i/2 for i in self.diameters]
+        return [i / 2 for i in self.diameters]
 
     @property
     def volume(self):
-        return (4/3) * np.pi * np.product(self.radii)
+        return (4 / 3) * np.pi * np.product(self.radii)
 
     @classmethod
     def from_diameters(cls, axis_sizes, centre, margins=None):
@@ -235,7 +262,7 @@ class Particle:
             major_axis_length=maj_ax_len,
             centre=centre,
             minor_axis_ratios=min_ax_ratios,
-            margins=margins
+            margins=margins,
         )
         return particle
 
@@ -248,7 +275,7 @@ class Particle:
 
     @property
     def minor_axis_dir(self):
-        """Unit vector of the third axis direction (i.e. after `major_axis_dir` and 
+        """Unit vector of the third axis direction (i.e. after `major_axis_dir` and
         `major_plane_normal_dir`"""
         xprod = np.cross(self.major_plane_normal_dir, self.major_axis_dir)
         minor_axis_dir = xprod / np.linalg.norm(xprod)
@@ -260,17 +287,37 @@ class Particle:
 
 class ParticleDistribution:
 
-    def __init__(self, number=None, major_axis_length=None, minor_axis_ratios=None,
-                 target_volume_fraction=None, major_axis_dir=None,
-                 major_plane_normal_dir=None, margins=None, major_axis_length_stddev=None,
-                 minor_axis_ratios_stddev=None, margins_stddev=None, random_seed=None,
-                 label=None, _particles=None):
+    def __init__(
+        self,
+        number=None,
+        major_axis_length=None,
+        minor_axis_ratios=None,
+        target_volume_fraction=None,
+        major_axis_dir=None,
+        major_plane_normal_dir=None,
+        margins=None,
+        major_axis_length_stddev=None,
+        minor_axis_ratios_stddev=None,
+        margins_stddev=None,
+        random_seed=None,
+        label=None,
+        _particles=None,
+    ):
 
-        if not _particles and sum(
-            [i is not None for i in (number, major_axis_length, target_volume_fraction)]
-        ) != 2:
-            raise ValueError('Specify exactly two of `number`, `major_axis_length` and '
-                             '`target_volume_fraction`.')
+        if (
+            not _particles
+            and sum(
+                [
+                    i is not None
+                    for i in (number, major_axis_length, target_volume_fraction)
+                ]
+            )
+            != 2
+        ):
+            raise ValueError(
+                "Specify exactly two of `number`, `major_axis_length` and "
+                "`target_volume_fraction`."
+            )
 
         if minor_axis_ratios is None:
             minor_axis_ratios = [1, 1]  # sphere
@@ -309,26 +356,26 @@ class ParticleDistribution:
 
     def to_JSON_like(self):
         dct = {
-            'label': self.label,
-            'number': self.number,
-            'major_axis_length': self.major_axis_length,
-            'minor_axis_ratios': self.minor_axis_ratios,
-            'target_volume_fraction': self.target_volume_fraction,
-            'major_axis_dir': self.major_axis_dir,
-            'major_plane_normal_dir': self.major_plane_normal_dir,
-            'margins': self.margins,
-            'random_seed': self.random_seed,
-            'major_axis_length_stddev': self.major_axis_length_stddev,
-            'minor_axis_ratios_stddev': self.minor_axis_ratios_stddev,
-            'margins_stddev': self.margins_stddev,
-            '_particles': [i.to_JSON_like() for i in self.particles]
+            "label": self.label,
+            "number": self.number,
+            "major_axis_length": self.major_axis_length,
+            "minor_axis_ratios": self.minor_axis_ratios,
+            "target_volume_fraction": self.target_volume_fraction,
+            "major_axis_dir": self.major_axis_dir,
+            "major_plane_normal_dir": self.major_plane_normal_dir,
+            "margins": self.margins,
+            "random_seed": self.random_seed,
+            "major_axis_length_stddev": self.major_axis_length_stddev,
+            "minor_axis_ratios_stddev": self.minor_axis_ratios_stddev,
+            "margins_stddev": self.margins_stddev,
+            "_particles": [i.to_JSON_like() for i in self.particles],
         }
         return dct
 
     @classmethod
     def from_JSON_like(cls, dct):
         dct = copy.deepcopy(dct)
-        particles = [Particle.from_JSON_like(i) for i in dct.pop('_particles', [])]
+        particles = [Particle.from_JSON_like(i) for i in dct.pop("_particles", [])]
         obj = cls(_particles=particles, **dct)
         for particle in obj.particles:
             particle.distribution = obj
@@ -347,12 +394,14 @@ class ParticleDistribution:
     def calculate_number(self, RVE_size):
 
         if self.major_axis_length is None or self.target_volume_fraction is None:
-            raise ValueError('Cannot calculate number of particles; `major_axis_length` '
-                             'and `target_volume_fraction` must be set.')
+            raise ValueError(
+                "Cannot calculate number of particles; `major_axis_length` "
+                "and `target_volume_fraction` must be set."
+            )
 
         RVE_volume = np.product(RVE_size)
         particle_vol = (np.pi / 6) * (
-            (self.major_axis_length ** 3) * np.product(self.minor_axis_ratios)
+            (self.major_axis_length**3) * np.product(self.minor_axis_ratios)
         )
         particle_vol_total = RVE_volume * self.target_volume_fraction
         number = int(np.round(particle_vol_total / particle_vol))
@@ -362,8 +411,10 @@ class ParticleDistribution:
     def calculate_major_axis_length(self, RVE_size):
 
         if self.number is None or self.target_volume_fraction is None:
-            raise ValueError('Cannot calculate `major_axis_length`; `number` and '
-                             '`target_volume_fraction` must be set.')
+            raise ValueError(
+                "Cannot calculate `major_axis_length`; `number` and "
+                "`target_volume_fraction` must be set."
+            )
 
         RVE_volume = np.product(RVE_size)
         particle_vol_total = RVE_volume * self.target_volume_fraction
@@ -377,12 +428,14 @@ class ParticleDistribution:
     def calculate_volume_fraction(self, RVE_size):
 
         if self.major_axis_length is None or self.number is None:
-            raise ValueError('Cannot calculate `target_volume_fraction`; '
-                             '`major_axis_length` and `number` must be set.')
+            raise ValueError(
+                "Cannot calculate `target_volume_fraction`; "
+                "`major_axis_length` and `number` must be set."
+            )
 
         RVE_volume = np.product(RVE_size)
         particle_vol = (np.pi / 6) * (
-            (self.major_axis_length ** 3) * np.product(self.minor_axis_ratios)
+            (self.major_axis_length**3) * np.product(self.minor_axis_ratios)
         )
         volume_fraction = self.number * particle_vol / RVE_volume
 
@@ -408,8 +461,15 @@ class ParticleDistribution:
 
 class ParticleRVE:
 
-    def __init__(self, size, cells=None, material=None, particles=None, random_seed=None,
-                 particle_distributions=None):
+    def __init__(
+        self,
+        size,
+        cells=None,
+        material=None,
+        particles=None,
+        random_seed=None,
+        particle_distributions=None,
+    ):
         """
         Parameters
         ----------
@@ -433,7 +493,7 @@ class ParticleRVE:
         self.size = np.array(size)
 
         if cells is not None and material is not None:
-            raise ValueError('Specify exactly one of `cells` and `material`, not both.')
+            raise ValueError("Specify exactly one of `cells` and `material`, not both.")
 
         if material is not None:
             self._material = np.array(material)
@@ -462,33 +522,41 @@ class ParticleRVE:
     def to_JSON_like(self):
         """Get a JSON-compatible dict that can be reloaded with `from_json_like`."""
         dct = {
-            'size': self.size,
-            '_material': self._material,
-            'particle_distributions': [i.to_JSON_like() for i in self.particle_distributions],
-            'particles': [i.to_JSON_like() for i in self.particles],
-            'random_seed': self.random_seed,
+            "size": self.size,
+            "_material": self._material,
+            "particle_distributions": [
+                i.to_JSON_like() for i in self.particle_distributions
+            ],
+            "particles": [i.to_JSON_like() for i in self.particles],
+            "random_seed": self.random_seed,
         }
         return dct
 
     @classmethod
     def from_JSON_like(cls, dct):
         dct = copy.deepcopy(dct)
-        particles = [Particle.from_JSON_like(i) for i in dct['particles']]
+        particles = [Particle.from_JSON_like(i) for i in dct["particles"]]
         particle_distributions = [
-            ParticleDistribution.from_JSON_like(i)
-            for i in dct['particle_distributions']
+            ParticleDistribution.from_JSON_like(i) for i in dct["particle_distributions"]
         ]
         obj = cls(
-            size=dct['size'],
-            material=dct['_material'],
+            size=dct["size"],
+            material=dct["_material"],
             particles=particles,
             particle_distributions=particle_distributions,
         )
         return obj
 
     @classmethod
-    def from_voronoi_tessellation(cls, size, cells, seeds, particles=None,
-                                  particle_distributions=None, random_seed=None):
+    def from_voronoi_tessellation(
+        cls,
+        size,
+        cells,
+        seeds,
+        particles=None,
+        particle_distributions=None,
+        random_seed=None,
+    ):
         """
         Parameters
         ----------
@@ -498,7 +566,7 @@ class ParticleRVE:
             Number of cells in x, y, z directions. Specify exactly one of `cells` or
             `material`.
         seeds : numpy.ndarray of shape (N, 3)
-            Position of the seed points.        
+            Position of the seed points.
         particles : list of (dict or Particle)
             Dict with the following keys:
                 major_axis_size : number
@@ -612,7 +680,9 @@ class ParticleRVE:
         )
 
     def _get_random_centre(self):
-        centre = self.rng.random(3,)
+        centre = self.rng.random(
+            3,
+        )
         centre[0] *= self.size[0]
         centre[1] *= self.size[1]
         centre[2] *= self.size[2]
@@ -620,16 +690,20 @@ class ParticleRVE:
 
     def _generate_damask_grid_obj(self):
         from damask import Grid
+
         grid_obj = Grid(material=self._material, size=self.size)
         return grid_obj
 
     def _add_particle(self, particle, dist_label=None):
         from damask import Rotation
-        rot_mat = np.array([
-            particle.major_axis_dir,
-            particle.minor_axis_dir,
-            particle.major_plane_normal_dir,
-        ]).T
+
+        rot_mat = np.array(
+            [
+                particle.major_axis_dir,
+                particle.minor_axis_dir,
+                particle.major_plane_normal_dir,
+            ]
+        ).T
         grid_obj = self.grid_obj.add_primitive(
             dimension=particle.diameters,
             center=particle.centre,
@@ -646,9 +720,9 @@ class ParticleRVE:
     @property
     def matrix_voxels(self):
         """Get a bool array that shows where matrix voxels are."""
-        return np.logical_or.reduce([
-            self.material == i for i in self.matrix_material_IDs
-        ])
+        return np.logical_or.reduce(
+            [self.material == i for i in self.matrix_material_IDs]
+        )
 
     @property
     def particle_voxels(self):
@@ -656,18 +730,19 @@ class ParticleRVE:
         return np.logical_not(self.matrix_voxels)
 
     def get_particle_distribution_voxels(self, dist_label):
-        """Get a bool array that shows where particles voxels are that belong to a given 
+        """Get a bool array that shows where particles voxels are that belong to a given
         distribution."""
-        return np.logical_or.reduce([
-            self.material == i for i in self.particle_material_IDs[dist_label]
-        ])
+        return np.logical_or.reduce(
+            [self.material == i for i in self.particle_material_IDs[dist_label]]
+        )
 
     @property
     def num_voxels(self):
         return np.product(self.cells)
 
-    def add_particle(self, particle, find_good_position=False, max_iter=1_000,
-                     dist_label=None):
+    def add_particle(
+        self, particle, find_good_position=False, max_iter=1_000, dist_label=None
+    ):
         """Add a particle to the RVE."""
 
         if not isinstance(particle, Particle):
@@ -675,7 +750,7 @@ class ParticleRVE:
 
         if not find_good_position:
             # Add without searching for a good position:
-            print(f'Using existing centre.')
+            print(f"Using existing centre.")
             self._add_particle(particle, dist_label=dist_label)
 
         else:
@@ -693,16 +768,17 @@ class ParticleRVE:
 
             # Find overlap voxels with existing particles:
             overlap_bool = np.logical_and(
-                self.particle_voxels,
-                single_particle_RVE.material != 0
+                self.particle_voxels, single_particle_RVE.material != 0
             )
             single_particle_RVE_voxels = single_particle_RVE.material != 0
             overlap_fraction = np.sum(overlap_bool) / np.sum(single_particle_RVE_voxels)
             count = 0
             while np.any(overlap_bool):
                 if count > max_iter:
-                    print(f'Cannot find suitable position for particle in {max_iter} '
-                          f'iterations. Skipping.')
+                    print(
+                        f"Cannot find suitable position for particle in {max_iter} "
+                        f"iterations. Skipping."
+                    )
                     return
 
                 # Try a new position:
@@ -713,23 +789,24 @@ class ParticleRVE:
                     particles=[particle.margined_particle],
                 )
                 overlap_bool = np.logical_and(
-                    self.particle_voxels,
-                    single_particle_RVE.material != 0
+                    self.particle_voxels, single_particle_RVE.material != 0
                 )
                 single_particle_RVE_voxels = single_particle_RVE.material != 0
-                overlap_fraction = np.sum(overlap_bool) / \
-                    np.sum(single_particle_RVE_voxels)
+                overlap_fraction = np.sum(overlap_bool) / np.sum(
+                    single_particle_RVE_voxels
+                )
                 count += 1
 
-            print(f'Found suitable particle centre in {count} iterations.')
+            print(f"Found suitable particle centre in {count} iterations.")
 
             self._add_particle(particle, dist_label=dist_label)
 
-    def add_particles(self, particles, find_good_position=False, max_iter=1_000,
-                      dist_label=None):
-        print(f'Adding {len(particles)} particles...')
+    def add_particles(
+        self, particles, find_good_position=False, max_iter=1_000, dist_label=None
+    ):
+        print(f"Adding {len(particles)} particles...")
         for idx, particle in enumerate(particles):
-            print(f'Adding particle {idx}... ', end='')
+            print(f"Adding particle {idx}... ", end="")
             self.add_particle(
                 particle,
                 find_good_position,
@@ -747,17 +824,20 @@ class ParticleRVE:
         from damask import Rotation
 
         base_grid = self._generate_damask_grid_obj()
-        num_inserts = sum([len(particle.centre_history)
-                           for particle in self.all_particles])
+        num_inserts = sum(
+            [len(particle.centre_history) for particle in self.all_particles]
+        )
         zero_pad_len = len(str(num_inserts))
         count = 0
-        base_grid.save(f'{directory}/particle_RVE_{count:0{zero_pad_len}}.vtr')
+        base_grid.save(f"{directory}/particle_RVE_{count:0{zero_pad_len}}.vtr")
         for particle in self.all_particles:
-            rot_mat = np.array([
-                particle.major_axis_dir,
-                particle.minor_axis_dir,
-                particle.major_plane_normal_dir,
-            ]).T
+            rot_mat = np.array(
+                [
+                    particle.major_axis_dir,
+                    particle.minor_axis_dir,
+                    particle.major_plane_normal_dir,
+                ]
+            ).T
             for historic_centre in particle.centre_history:
                 count += 1
                 grid = base_grid.add_primitive(
@@ -766,21 +846,22 @@ class ParticleRVE:
                     exponent=1,
                     R=Rotation.from_matrix(rot_mat),
                 )
-                grid.save(f'{directory}/particle_RVE_{count:0{zero_pad_len}}.vtr')
+                grid.save(f"{directory}/particle_RVE_{count:0{zero_pad_len}}.vtr")
             base_grid = grid
 
     def show_slice(self):
         from plotly import graph_objects
+
         data = [
             {
-                'type': 'heatmap',
-                'z': self.grid_obj.material[int(self.cells[0]/2)],
+                "type": "heatmap",
+                "z": self.grid_obj.material[int(self.cells[0] / 2)],
             }
         ]
         layout = {
-            'xaxis': {
-                'scaleanchor': 'y',
-                'constrain': 'domain',
+            "xaxis": {
+                "scaleanchor": "y",
+                "constrain": "domain",
             }
         }
         fig = graph_objects.FigureWidget(data=data, layout=layout)
@@ -788,6 +869,7 @@ class ParticleRVE:
 
     def show(self):
         from plotly import graph_objects
+
         # TODO: fix
         coords = get_coordinate_grid(self.size, self.cells)
         coords_flat = coords[0].reshape(-1, 3)
@@ -797,17 +879,17 @@ class ParticleRVE:
         coords_flat = coords_flat[~matrix_idx]
         data = [
             {
-                'type': 'volume',
-                'x': coords_flat[:, 0],
-                'y': coords_flat[:, 1],
-                'z': coords_flat[:, 2],
-                'value': value,
-                'surface_count': len(self.particles),
-                'opacity': 0.1,
+                "type": "volume",
+                "x": coords_flat[:, 0],
+                "y": coords_flat[:, 1],
+                "z": coords_flat[:, 2],
+                "value": value,
+                "surface_count": len(self.particles),
+                "opacity": 0.1,
             },
         ]
         layout = {
-            'xaxis': {},
+            "xaxis": {},
         }
         fig = graph_objects.FigureWidget(data=data, layout=layout)
         return fig

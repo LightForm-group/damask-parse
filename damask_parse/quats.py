@@ -37,7 +37,7 @@ def euler2quat(euler_angles, degrees=False, P=1):
     """
 
     if P not in [-1, 1]:
-        raise ValueError('P must be -1 or +1')
+        raise ValueError("P must be -1 or +1")
 
     if degrees:
         euler_angles = np.deg2rad(euler_angles)
@@ -51,12 +51,14 @@ def euler2quat(euler_angles, degrees=False, P=1):
     c = np.cos(Phi / 2)
     s = np.sin(Phi / 2)
 
-    quats = np.array([
-        +c * np.cos(sigma),
-        -P * s * np.cos(delta),
-        -P * s * np.sin(delta),
-        -P * c * np.sin(sigma),
-    ]).T
+    quats = np.array(
+        [
+            +c * np.cos(sigma),
+            -P * s * np.cos(delta),
+            -P * s * np.sin(delta),
+            -P * c * np.sin(sigma),
+        ]
+    ).T
 
     # Move to northern hemisphere:
     quats[quats[:, 0] < 0] *= -1
@@ -88,7 +90,7 @@ def axang2quat(axis, angle):
         P J Konijnenberg, and M De Graef. "Consistent Representations
         of and Conversions between 3D Rotations". Modelling and Simulation
         in Materials Science and Engineering 23, no. 8 (1 December 2015):
-        083501. https://doi.org/10.1088/0965-0393/23/8/083501.            
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.
 
     """
 
@@ -108,7 +110,7 @@ def multiply_quaternions(q1, q2, P=1):
     q1 : ndarray of shape (4,)
     q2 : ndarray of shape (4,)
     P : int, optional
-        The "P" constant, either +1 or -1, as defined within [1].    
+        The "P" constant, either +1 or -1, as defined within [1].
 
     Returns
     -------
@@ -120,7 +122,7 @@ def multiply_quaternions(q1, q2, P=1):
         P J Konijnenberg, and M De Graef. "Consistent Representations
         of and Conversions between 3D Rotations". Modelling and Simulation
         in Materials Science and Engineering 23, no. 8 (1 December 2015):
-        083501. https://doi.org/10.1088/0965-0393/23/8/083501.  
+        083501. https://doi.org/10.1088/0965-0393/23/8/083501.
 
     """
 

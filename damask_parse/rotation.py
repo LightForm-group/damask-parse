@@ -1,6 +1,6 @@
 """These functions have been borrowed from other Python packages:
-    - vec-maths (https://github.com/aplowman/vec-maths/) and
-    - crystex (https://github.com/maria-yankova/crystallographic-texture)
+- vec-maths (https://github.com/aplowman/vec-maths/) and
+- crystex (https://github.com/maria-yankova/crystallographic-texture)
 """
 
 import numpy as np
@@ -79,7 +79,7 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
     if axes.ndim == 1:
         axes = axes[np.newaxis]
 
-    angles_err_msg = '`angles` must be a number or array of shape (M,).'
+    angles_err_msg = "`angles` must be a number or array of shape (M,)."
 
     if isinstance(angles, np.ndarray):
         if angles.ndim != 1:
@@ -101,9 +101,10 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
             n = axes.shape[0]
         else:
             raise ValueError(
-                'Incompatible dimensions: the first dimension of `axes` or'
-                '`angles` must be one otherwise the first dimensions of `axes`'
-                'and `angles` must be equal.')
+                "Incompatible dimensions: the first dimension of `axes` or"
+                "`angles` must be one otherwise the first dimensions of `axes`"
+                "and `angles` must be equal."
+            )
 
     # Convert to radians if necessary
     if degrees:
@@ -120,10 +121,14 @@ def ax_ang2rot_mat(axes, angles, degrees=False):
     cross_prod_mat[:, 2, 0] = -axes[:, 1]
     cross_prod_mat[:, 2, 1] = axes[:, 0]
 
-    rot_mats = np.tile(np.eye(3), (n, 1, 1)) + (
-        np.sin(angles)[:, np.newaxis, np.newaxis] * cross_prod_mat) + (
-            (1 - np.cos(angles)[:, np.newaxis, np.newaxis]) * (
-                cross_prod_mat @ cross_prod_mat))
+    rot_mats = (
+        np.tile(np.eye(3), (n, 1, 1))
+        + (np.sin(angles)[:, np.newaxis, np.newaxis] * cross_prod_mat)
+        + (
+            (1 - np.cos(angles)[:, np.newaxis, np.newaxis])
+            * (cross_prod_mat @ cross_prod_mat)
+        )
+    )
 
     return rot_mats
 

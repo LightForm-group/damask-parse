@@ -408,28 +408,32 @@ class SpectralStdOutTestCase(TestCase):
 
         self.assertTrue(
             np.allclose(
-                out['deformation_gradient_aim'],
-                np.array([
-                    [1, 0, 0],
-                    [0, 1, 0],
-                    [0, 0, 1.0005],
-                ])
+                out["deformation_gradient_aim"],
+                np.array(
+                    [
+                        [1, 0, 0],
+                        [0, 1, 0],
+                        [0, 0, 1.0005],
+                    ]
+                ),
             )
         )
         self.assertTrue(
             np.allclose(
-                out['piola_kirchhoff_stress'],
-                np.array([
-                    [23.6511, -0.0171, -0.0231],
-                    [-0.0171, 23.5818, 0.0283],
-                    [-0.0231, 0.0284, 44.2691],
-                ])
+                out["piola_kirchhoff_stress"],
+                np.array(
+                    [
+                        [23.6511, -0.0171, -0.0231],
+                        [-0.0171, 23.5818, 0.0283],
+                        [-0.0231, 0.0284, 44.2691],
+                    ]
+                ),
             )
         )
-        self.assertTrue(np.isclose(out['error_divergence']['value'], 1.5e7))
-        self.assertTrue(np.isclose(out['error_divergence']['tol'], 2.21e4))
-        self.assertTrue(np.isclose(out['error_divergence']['relative'], 676.79))
+        self.assertTrue(np.isclose(out["error_divergence"]["value"], 1.5e7))
+        self.assertTrue(np.isclose(out["error_divergence"]["tol"], 2.21e4))
+        self.assertTrue(np.isclose(out["error_divergence"]["relative"], 676.79))
 
-        self.assertTrue(np.isclose(out['error_stress_BC']['value'], 2.37e7))
-        self.assertTrue(np.isclose(out['error_stress_BC']['tol'], 4.43e5))
-        self.assertTrue(np.isclose(out['error_stress_BC']['relative'], 53.43))
+        self.assertTrue(np.isclose(out["error_stress_BC"]["value"], 2.37e7))
+        self.assertTrue(np.isclose(out["error_stress_BC"]["tol"], 4.43e5))
+        self.assertTrue(np.isclose(out["error_stress_BC"]["relative"], 53.43))
