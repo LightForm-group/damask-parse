@@ -18,10 +18,10 @@ from damask_parse.utils import (
 )
 
 __all__ = [
-    'write_geom',
-    'write_material',
-    'write_numerics',
-    'write_load_case',
+    "write_geom",
+    "write_material",
+    "write_numerics",
+    "write_load_case",
 ]
 
 
@@ -71,9 +71,9 @@ def write_geom(
         from damask import Grid as grid_cls
 
     volume_element = validate_volume_element(volume_element)
-    element_material_idx = volume_element['element_material_idx']
-    ve_size = volume_element.get('size')
-    ve_origin = volume_element.get('origin')
+    element_material_idx = volume_element["element_material_idx"]
+    ve_size = volume_element.get("size")
+    ve_origin = volume_element.get("origin")
     if ve_size is None:
         ve_size = [1.0, 1.0, 1.0]
     if ve_origin is None:
@@ -82,15 +82,25 @@ def write_geom(
     dir_path = Path(dir_path).resolve()
     geom_path = dir_path.joinpath(name)
 
-    ve_grid = grid_cls(material=element_material_idx, size=ve_size,
-                   origin=ve_origin, initial_conditions=initial_conditions)
+    ve_grid = grid_cls(
+        material=element_material_idx,
+        size=ve_size,
+        origin=ve_origin,
+        initial_conditions=initial_conditions,
+    )
     ve_grid.save(geom_path)
 
     return geom_path
 
 
-def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
-                    name='load.yaml', write_2D_arrs=False):
+def write_load_case(
+    dir_path,
+    load_cases,
+    solver=None,
+    initial_conditions=None,
+    name="load.yaml",
+    write_2D_arrs=False,
+):
     """Write the load file for a DAMASK simulation.
 
     Parameters
@@ -117,7 +127,7 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
 
     if solver is None:
         solver = {
-            'mechanical': 'spectral_basic',
+            "mechanical": "spectral_basic",
         }
 
     load_steps = []
@@ -128,20 +138,20 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
 
     for load_case in load_cases:
 
-        def_grad_aim = load_case.get('def_grad_aim')
-        def_grad_rate = load_case.get('def_grad_rate')
-        vel_grad = load_case.get('vel_grad')
-        stress = load_case.get('stress')
-        stress_rate = load_case.get('stress_rate')
-        rot = load_case.get('rotation_matrix')
-        total_time = load_case['total_time']
-        num_increments = load_case['num_increments']
-        freq = load_case.get('dump_frequency', 1)
+        def_grad_aim = load_case.get("def_grad_aim")
+        def_grad_rate = load_case.get("def_grad_rate")
+        vel_grad = load_case.get("vel_grad")
+        stress = load_case.get("stress")
+        stress_rate = load_case.get("stress_rate")
+        rot = load_case.get("rotation_matrix")
+        total_time = load_case["total_time"]
+        num_increments = load_case["num_increments"]
+        freq = load_case.get("dump_frequency", 1)
 
-        if sum((x is not None
-                for x in (def_grad_aim, def_grad_rate, vel_grad))) > 1:
-            msg = ('Specify only one of `def_grad_rate`,  `def_grad_aim` '
-                   'and `vel_grad`.')
+        if sum((x is not None for x in (def_grad_aim, def_grad_rate, vel_grad))) > 1:
+            msg = (
+                "Specify only one of `def_grad_rate`,  `def_grad_aim` " "and `vel_grad`."
+            )
             raise ValueError(msg)
 
         # If def_grad_aim/rate is masked array, stress masked array should also be passed,
@@ -151,52 +161,51 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
         dg_arr_sym = None
         if def_grad_aim is not None:
             dg_arr = def_grad_aim
-            dg_arr_sym = 'F'
+            dg_arr_sym = "F"
         elif def_grad_rate is not None:
             dg_arr = def_grad_rate
-            dg_arr_sym = 'dot_F'
+            dg_arr_sym = "dot_F"
         elif vel_grad is not None:
             dg_arr = vel_grad
-            dg_arr_sym = 'L'
+            dg_arr_sym = "L"
 
         stress_arr = None
         stress_arr_sym = None
         if stress is not None:
             stress_arr = stress
-            stress_arr_sym = 'P'
+            stress_arr_sym = "P"
         elif stress_rate is not None:
             stress_arr = stress_rate
-            stress_arr_sym = 'dot_P'
+            stress_arr_sym = "dot_P"
 
         # If load case tensors are specified as (nested) lists with fill values, convert
         # to masked arrays:
         if isinstance(dg_arr, list):
             if isinstance(dg_arr[0], list):
                 dg_arr = [j for i in dg_arr for j in i]  # flatten
-            dg_arr = masked_array_from_list(dg_arr, fill_value='x').reshape((3, 3))
+            dg_arr = masked_array_from_list(dg_arr, fill_value="x").reshape((3, 3))
 
         if isinstance(stress_arr, list):
             if isinstance(stress_arr[0], list):
                 stress_arr = [j for i in stress_arr for j in i]  # flatten
-            stress_arr = masked_array_from_list(stress_arr, fill_value='x').reshape((3, 3))
+            stress_arr = masked_array_from_list(stress_arr, fill_value="x").reshape(
+                (3, 3)
+            )
 
-        load_step = {
-            'boundary_conditions': {
-                'mechanical': {}
-            }
-        }
-        bc_mech = load_step['boundary_conditions']['mechanical']
+        load_step = {"boundary_conditions": {"mechanical": {}}}
+        bc_mech = load_step["boundary_conditions"]["mechanical"]
 
         if stress_arr is None:
 
             if dg_arr is None:
-                msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
-                       '`vel_grad`.')
+                msg = "Specify one of `def_grad_rate`, `def_grad_aim` or " "`vel_grad`."
                 raise ValueError(msg)
 
             if isinstance(dg_arr, np.ma.core.MaskedArray):
-                msg = ('To use mixed boundary conditions, `stress`/`stress_rate` must be '
-                       'passed as a masked array.')
+                msg = (
+                    "To use mixed boundary conditions, `stress`/`stress_rate` must be "
+                    "passed as a masked array."
+                )
                 raise ValueError(msg)
 
             bc_mech[dg_arr_sym] = fmt_arr_func(dg_arr)
@@ -205,22 +214,24 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
             if isinstance(stress_arr, np.ma.core.MaskedArray):
 
                 if dg_arr is None:
-                    msg = ('Specify one of `def_grad_rate`, `def_grad_aim` or '
-                           '`vel_grad`.')
+                    msg = (
+                        "Specify one of `def_grad_rate`, `def_grad_aim` or " "`vel_grad`."
+                    )
                     raise ValueError(msg)
 
-                msg = ('`def_grad_rate`, `def_grad_aim` or `vel_grad` must be '
-                       'component-wise exclusive with `stress` or `stress_rate` (both as '
-                       'masked arrays)')
+                msg = (
+                    "`def_grad_rate`, `def_grad_aim` or `vel_grad` must be "
+                    "component-wise exclusive with `stress` or `stress_rate` (both as "
+                    "masked arrays)"
+                )
                 if not isinstance(dg_arr, np.ma.core.MaskedArray):
                     raise ValueError(msg)
                 if np.any(dg_arr.mask == stress_arr.mask):
                     raise ValueError(msg)
 
-                if dg_arr_sym == 'L':
+                if dg_arr_sym == "L":
                     if any((sum(row) not in (0, 3) for row in dg_arr.mask)):
-                        msg = ('Specify all or no values for each row of '
-                               '`vel_grad`')
+                        msg = "Specify all or no values for each row of " "`vel_grad`"
                         raise ValueError(msg)
 
                 bc_mech[dg_arr_sym] = fmt_arr_func(dg_arr)
@@ -228,15 +239,17 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
 
             else:
                 if dg_arr is not None:
-                    msg = ('To use mixed boundary conditions, `stress` or `stress_rate`'
-                           f'must be passed as a masked array.')
+                    msg = (
+                        "To use mixed boundary conditions, `stress` or `stress_rate`"
+                        f"must be passed as a masked array."
+                    )
                     raise ValueError(msg)
 
                 bc_mech[stress_arr_sym] = fmt_arr_func(stress_arr)
 
         if rot is not None:
             rot = np.array(rot)
-            msg = 'Matrix passed as a rotation is not a rotation matrix.'
+            msg = "Matrix passed as a rotation is not a rotation matrix."
             if not np.allclose(rot.T @ rot, np.eye(3)):
                 raise ValueError(msg)
             if not np.isclose(np.linalg.det(rot), 1):
@@ -245,23 +258,20 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
             rot = Rotation._om2ax(rot)
             rot[3] *= 180 / np.pi
 
-            bc_mech['R'] = rot.tolist()
+            bc_mech["R"] = rot.tolist()
 
-        load_step['discretization'] = {
-            't': total_time,
-            'N': num_increments,
+        load_step["discretization"] = {
+            "t": total_time,
+            "N": num_increments,
         }
-        load_step['f_out'] = freq
+        load_step["f_out"] = freq
 
         load_steps.append(load_step)
 
-    load_data = {
-        'solver': solver,
-        'loadstep': load_steps
-    }
+    load_data = {"solver": solver, "loadstep": load_steps}
 
     if initial_conditions is not None:
-        load_data['initial_conditions'] = initial_conditions
+        load_data["initial_conditions"] = initial_conditions
 
     dir_path = Path(dir_path).resolve()
     load_path = dir_path.joinpath(name)
@@ -272,7 +282,7 @@ def write_load_case(dir_path, load_cases, solver=None, initial_conditions=None,
     return load_path
 
 
-def write_material(homog_schemes, phases, volume_element, dir_path, name='material.yaml'):
+def write_material(homog_schemes, phases, volume_element, dir_path, name="material.yaml"):
     """Write the material.yaml file for a DAMASK simulation.
 
     Parameters
@@ -383,14 +393,16 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     )
 
     # Only include phases that are used:
-    phases = {phase_name: phase_data
-              for phase_name, phase_data in phases.items()
-              if phase_name in volume_element['constituent_phase_label']}
-    
+    phases = {
+        phase_name: phase_data
+        for phase_name, phase_data in phases.items()
+        if phase_name in volume_element["constituent_phase_label"]
+    }
+
     mat_dat = {
-        'phase': phases,
-        'homogenization': homog_schemes,
-        'material': materials,
+        "phase": phases,
+        "homogenization": homog_schemes,
+        "material": materials,
     }
     mat_data_fmt = prepare_material_yaml_data(mat_dat)  # e.g. format quats to 15 d.p.
 
@@ -403,7 +415,7 @@ def write_material(homog_schemes, phases, volume_element, dir_path, name='materi
     return mat_path
 
 
-def write_numerics(dir_path, numerics, name='numerics.yaml'):
+def write_numerics(dir_path, numerics, name="numerics.yaml"):
     """Write the optional numerics.yaml file for a DAMASK simulation.
 
     Parameters

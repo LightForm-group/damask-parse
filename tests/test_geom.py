@@ -9,9 +9,7 @@ from unittest import TestCase
 
 import numpy as np
 
-from damask_parse.utils import (
-    check_volume_elements_equal, validate_volume_element_OLD
-)
+from damask_parse.utils import check_volume_elements_equal, validate_volume_element_OLD
 
 
 class VolumeElementTestCase(TestCase):
@@ -28,8 +26,8 @@ class VolumeElementTestCase(TestCase):
         """Test error raised on unknown key."""
 
         vol_elem = {
-            'grain_idx': np.random.randint(0, 9, (2, 2, 2)),
-            'bad_key': 1,
+            "grain_idx": np.random.randint(0, 9, (2, 2, 2)),
+            "bad_key": 1,
         }
         with self.assertRaises(ValueError):
             validate_volume_element_OLD(vol_elem)
@@ -37,9 +35,7 @@ class VolumeElementTestCase(TestCase):
     def test_validation_grain_idx_value(self):
         """Test error raised on incorrect `grain_idx` dimension."""
 
-        vol_elem = {
-            'grain_idx': np.random.randint(0, 9, (2, 2))
-        }
+        vol_elem = {"grain_idx": np.random.randint(0, 9, (2, 2))}
         with self.assertRaises(ValueError):
             validate_volume_element_OLD(vol_elem)
 
@@ -49,10 +45,10 @@ class VolumeElementTestCase(TestCase):
 
         grain_idx = np.random.randint(0, 9, (2, 2, 2))
         vol_elem_a = {
-            'grain_idx': grain_idx,
+            "grain_idx": grain_idx,
         }
         vol_elem_b = {
-            'grain_idx': grain_idx,
+            "grain_idx": grain_idx,
         }
 
         self.assertTrue(check_volume_elements_equal(vol_elem_a, vol_elem_b))
@@ -63,10 +59,10 @@ class VolumeElementTestCase(TestCase):
 
         grain_idx = np.random.randint(0, 9, (2, 2, 2))
         vol_elem_a = {
-            'grain_idx': grain_idx,
+            "grain_idx": grain_idx,
         }
         vol_elem_b = {
-            'grain_idx': grain_idx + 1,
+            "grain_idx": grain_idx + 1,
         }
 
         self.assertFalse(check_volume_elements_equal(vol_elem_a, vol_elem_b))
