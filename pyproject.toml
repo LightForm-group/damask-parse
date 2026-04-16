@@ -16,6 +16,10 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]
+packages = [
+    { include = "damask_parse" },
+    { include = "tests" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.14"
