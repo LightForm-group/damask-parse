@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "damask-parse"
-version = "0.6.1"
+version = "0.6.2"
 description = "Input file writers and output file readers for the crystal plasticity code DAMASK."
 authors = [
     "Adam Plowman <adam.plowman@manchester.ac.uk>",
@@ -47,7 +47,7 @@ pytest = "^9.0.3"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.6.1"
+version = "0.6.2"
 tag_format = "v$version"
 version_files = [ 
     "pyproject.toml:version",

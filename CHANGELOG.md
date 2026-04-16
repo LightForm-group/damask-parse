@@ -1,4 +1,21 @@
 
+<a name="v0.6.2"></a>
+## [v0.6.2](https://github.com/LightForm-group/damask-parse/compare/v0.6.1...v0.6.2) - 2026.04.16
+
+### 🐛 Bug Fixes
+
+* remove misleading example/roadmap from readme
+
+### 👷 Build changes
+
+* try to include test files and data in dist
+* **deps:** bump pillow from 12.0.0 to 12.2.0
+* **deps:** bump fonttools from 4.60.1 to 4.60.2
+* **deps-dev:** bump tornado from 6.5.2 to 6.5.5
+* **deps-dev:** bump pygments from 2.19.2 to 2.20.0
+* **deps-dev:** bump virtualenv from 20.35.4 to 20.36.1
+
+
 <a name="v0.6.1"></a>
 ## [v0.6.1](https://github.com/LightForm-group/damask-parse/compare/v0.6.0...v0.6.1) - 2026.04.16
 
