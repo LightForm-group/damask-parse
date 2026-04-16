@@ -1,9 +1,10 @@
 """`damask_parse.readers.py`"""
 
-from collections import defaultdict
 from pathlib import Path
 
 import re
+from typing import Any
+import warnings
 import numpy as np
 from ruamel.yaml import YAML
 
@@ -27,31 +28,200 @@ __all__ = [
 ]
 
 
-def parse_increment_iteration(inc_iter_str):
+INC_DELIM = r"\s#{75}"
+ITER_DELIM = r"\s={75}"
+INC_HEADER_PATTERN = re.compile(
+    r"Time\s+([\d.E+-]+)s:\s+Increment\s+(\d+)/(\d+)-(\d+)/(\d+)\s+"
+    r"of load case\s+(\d+)/(\d+)"
+)
+STAGGERED_ITER_PATTERN = re.compile(r"Staggered Iteration\s+(\d+)")
+MECHANICAL_ITER_REPORT_PATTERN = re.compile(r"deformation gradient aim\s+=")
+THERMAL_ITER_REPORT_PATTERN = re.compile(r"thermal conduction converged")
+FLOAT_PATTERN = r"[+-]?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?"
+THERMAL_DAT_PATTERN = re.compile(
+    r"Minimum\|Maximum\|Delta Temperature\s*/\s*K\s*=\s*"
+    r"(" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")\s+(" + FLOAT_PATTERN + r")"
+)
+ITER_HEADER_PAT = re.compile(
+    r"Increment\s+(\d+)/(\d+)-(\d+)/(\d+)\s+@\s+Iteration\s+(\d+)≤(\d+)≤(\d+)"
+)
+INC_CONV_PAT = re.compile(r"increment\s+\d+\s+converged")
+START_DATE_PAT = re.compile(r"\s*Date:\s*(\d{2}/\d{2}/\d{4})\s*")
+START_TIME_PAT = re.compile(r"\s*Time:\s*(\d{2}:\d{2}:\d{2})\s*")
+TERM_TIME_PAT = re.compile(
+    r"DAMASK terminated on:\s*"
+    r"\n\s*Date:\s*(\d{2}/\d{2}/\d{4})\s*"
+    r"\n\s*Time:\s*(\d{2}:\d{2}:\d{2})"
+)
 
-    float_pat = r"-?\d+\.\d+"
-    sci_float_pat = r"-?\d+\.\d+E[+|-]\d+"
 
-    dg_pat = r"deformation gradient aim\s+=\n(\s+(?:(?:" + float_pat + r"\s+){3}){3})"
-    dg_match = re.search(dg_pat, inc_iter_str)
+def read_spectral_stdout(
+    path: str | Path, encoding: str = "utf8", concat_arrays: bool = True
+) -> dict[str, Any]:
+    path = Path(path)
+
+    with path.open("r", encoding=encoding) as handle:
+        lines = handle.read()
+
+    incs_split = re.split(INC_DELIM, lines)
+    inc_dat_strs = incs_split[1:-1]  # first and last splits not inc data
+    inc_dat_list = []
+    for inc_str_i in inc_dat_strs:
+        inc_dat = parse_increment(inc_str_i)
+        inc_dat_list.append(inc_dat)
+
+    # might have an incomplete increment at the end (non-converged or killed):
+    if INC_HEADER_PATTERN.search(incs_split[-1]):
+        inc_dat_list.append(parse_increment(incs_split[-1]))
+
+    start_time_match = START_TIME_PAT.search(incs_split[0])
+    start_date_match = START_DATE_PAT.search(incs_split[0])
+
+    if end_date_time_match := TERM_TIME_PAT.search(incs_split[-1]):
+        # simulation might have been killed before completion
+        end_date = end_date_time_match.group(1)
+        end_time = end_date_time_match.group(2)
+    else:
+        end_date = None
+        end_time = None
+
+    out = {
+        "increments": inc_dat_list,
+        "start_time": start_time_match.group(1),
+        "start_date": start_date_match.group(1),
+        "end_date": end_date,
+        "end_time": end_time,
+    }
+    if concat_arrays:
+        concat_stdout_arrays(out)
+
+    return out
+
+
+def parse_increment(inc_str: str) -> dict[str, Any]:
+    """Parse an increment from DAMASK's standard output stream.
+
+    An increment includes a header that states the time, increment number (and how many
+    total increments are to be simulated in the load case), and the load case number (and
+    how many total load cases are to be simulated). The header is followed by one or more
+    iterations, which include the deformation gradient and Piola-Kirchhoff stress.
+
+    Note that the same increment may be repeated multiple times in the output stream if
+    the increment did not converge, and the increment was cut back (i.e. the time step was
+    reduced and the increment was re-attempted).
+
+    Each increment should end in either "converged" or "cutting back" (and possibly a
+    message about saving results).
+
+    In the case of multiple active fields (e.g. mechanical and thermal), DAMASK uses a
+    staggered iteration approach; this is reflected in the standard output stream with a
+    "Staggered Iteration N" line separating different staggered iteration indices.
+
+    """
+    inc_header_match = INC_HEADER_PATTERN.search(inc_str)
+    time = float(inc_header_match.group(1))
+    inc_num = int(inc_header_match.group(2))
+    inc_total = int(inc_header_match.group(3))
+    cut_back_num = int(inc_header_match.group(4))
+    cut_back_total = int(inc_header_match.group(5))
+    load_case_num = int(inc_header_match.group(6))
+    load_case_total = int(inc_header_match.group(7))
+
+    iter_dat_str = re.split(ITER_DELIM, inc_str)
+    stag_iter_idx = None
+    mech_iters = []
+    therm_iters = []
+    for dat_str_i in iter_dat_str:
+        if stag_iter_match := STAGGERED_ITER_PATTERN.search(dat_str_i):
+            stag_iter_idx = int(stag_iter_match.group(1))
+        if MECHANICAL_ITER_REPORT_PATTERN.search(dat_str_i):
+            mech_iter_dat = parse_mechanical_iteration(dat_str_i, stag_iter_idx)
+            mech_iters.append(mech_iter_dat)
+        elif THERMAL_ITER_REPORT_PATTERN.search(dat_str_i):
+            thermal_iter_dat = parse_thermal_iteration(dat_str_i, stag_iter_idx)
+            therm_iters.append(thermal_iter_dat)
+
+    is_converged = bool(INC_CONV_PAT.search(inc_str))
+
+    warn_msg = r"│\s+warning\s+│\s+│\s+(\d+)\s+│\s+├─+┤\s+│(.*)│\s+\s+│(.*)│"
+    warnings_matches = re.findall(warn_msg, inc_str)
+    warnings = [
+        {
+            "code": int(i[0]),
+            "message": i[1].strip() + " " + i[2].strip(),
+        }
+        for i in warnings_matches
+    ]
+
+    return {
+        "inc": inc_num,
+        "inc_total": inc_total,
+        "time": time,
+        "cut_back_num": cut_back_num,
+        "cut_back_total": cut_back_total,
+        "load_case_num": load_case_num,
+        "load_case_total": load_case_total,
+        "mechanical_iterations": mech_iters,
+        "thermal_iterations": therm_iters,
+        "is_converged": is_converged,
+        "warnings": warnings,
+    }
+
+
+def parse_thermal_iteration(
+    inc_iter_str: str, stag_iter_idx: int | None = None
+) -> dict[str, Any]:
+    """Parse a thermal iteration from an increment in DAMASK's standard output stream."""
+    match = THERMAL_DAT_PATTERN.search(inc_iter_str)
+    return {
+        "minimum_temperature_K": float(match.group(1)),
+        "maximum_temperature_K": float(match.group(2)),
+        "delta_temperature_K": float(match.group(3)),
+        "staggered_iter_idx": stag_iter_idx,
+    }
+
+
+def parse_mechanical_iteration(
+    inc_iter_str: str, stag_iter_idx: int | None = None
+) -> dict[str, Any]:
+    """Parse a mechanical iteration from an increment in DAMASK's standard output stream."""
+    FLOAT_PAT = r"-?\d+\.\d+"
+    SCI_FLOAT_PAT = r"-?\d+\.\d+E[+|-]\d+"
+    DG_PAT = r"deformation gradient aim\s+=\n(\s+(?:(?:" + FLOAT_PAT + r"\s+){3}){3})"
+    PK_PAT = (
+        r"Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:" + FLOAT_PAT + r"\s+){3}){3})"
+    )
+
+    if iter_head_match := ITER_HEADER_PAT.search(inc_iter_str):
+        iter_min = int(iter_head_match.group(5))
+        iter_num = int(iter_head_match.group(6))
+        iter_max = int(iter_head_match.group(7))
+    else:
+        warnings.warn(
+            "Unable to parse iteration number and bounds from iteration string."
+        )
+        iter_min = None
+        iter_num = None
+        iter_max = None
+
+    dg_match = re.search(DG_PAT, inc_iter_str)
     dg_str = dg_match.group(1)
     dg = np.array([float(i) for i in dg_str.split()]).reshape((3, 3))
 
-    pk_pat = (
-        r"Piola--Kirchhoff stress\s+\/\s.*=\n(\s+(?:(?:" + float_pat + r"\s+){3}){3})"
-    )
-    pk_match = re.search(pk_pat, inc_iter_str)
-    pk_str = pk_match.group(1)
-    pk = np.array([float(i) for i in pk_str.split()]).reshape((3, 3))
+    pk_matches = re.findall(PK_PAT, inc_iter_str)
+    pk_tensors = []
+    for pk_str in pk_matches:
+        pk = np.array([float(x) for x in pk_str.split()]).reshape((3, 3))
+        pk_tensors.append(pk)
 
-    err_pat = (
+    ERR_PAT = (
         r"error (.*)\s+=\s+(-?\d+\.\d+)\s\(("
-        + sci_float_pat
+        + SCI_FLOAT_PAT
         + r")\s(.*),\s+tol\s+=\s+("
-        + sci_float_pat
+        + SCI_FLOAT_PAT
         + r")\)"
     )
-    err_matches = re.findall(err_pat, inc_iter_str)
+    err_matches = re.findall(ERR_PAT, inc_iter_str)
     converge_err = {}
     for i in err_matches:
         err_key = "error_" + i[0].strip().replace(" ", "_")
@@ -67,92 +237,59 @@ def parse_increment_iteration(inc_iter_str):
         )
 
     inc_iter = {
+        "iter_num": iter_num,
+        "iter_min": iter_min,
+        "iter_max": iter_max,
         "deformation_gradient_aim": dg,
-        "piola_kirchhoff_stress": pk,
+        "piola_kirchhoff_stress": pk_tensors,
+        "staggered_iter_idx": stag_iter_idx,
         **converge_err,
     }
 
     return inc_iter
 
 
-def parse_increment(inc_str):
+def concat_stdout_arrays(stdout_dat: dict[str, Any]) -> None:
+    """Concatenate all Piola-Kirchhoff stress and deformation gradient tensors parsed
+    from `read_spectral_stdout` into two arrays of shape (N, 3, 3), where N is the total
+    number of arrays across all increments.
 
-    warn_msg = r"│\s+warning\s+│\s+│\s+(\d+)\s+│\s+├─+┤\s+│(.*)│\s+\s+│(.*)│"
-    warnings_matches = re.findall(warn_msg, inc_str)
-    warnings = [
-        {
-            "code": int(i[0]),
-            "message": i[1].strip() + " " + i[2].strip(),
-        }
-        for i in warnings_matches
-    ]
+    """
 
-    if not re.search(r"increment\s\d+\sconverged", inc_str):
-        parsed_inc = {
-            "converged": False,
-            "warnings": warnings,
-        }
-        return parsed_inc
-
-    inc_position_pat = (
-        r"Time\s+(\d+\.\d+E[+|-]\d+)s:\s+Increment"
-        r"\s+(\d+\/\d+)-(\d+\/\d+)\s+of\sload\scase\s+(\d+)"
-    )
-    inc_pos = re.search(inc_position_pat, inc_str)
-    inc_pos_dat = inc_pos.groups()
-
-    inc_time = float(inc_pos_dat[0])
-    inc_number = int(inc_pos_dat[1].split("/")[0])
-    inc_cut_back = 1 / int(inc_pos_dat[2].split("/")[1])
-    inc_load_case = int(inc_pos_dat[3])
-
-    inc_iter_split_str = r"={75}"
-    inc_iter_split = re.split(inc_iter_split_str, inc_str)
-
-    dg_arr = []
-    pk_arr = []
-    converge_errors = None
-    err_keys = None
-    num_iters = len(inc_iter_split) - 1
-
-    for idx, i in enumerate(inc_iter_split[:-1]):
-
-        inc_iter_i = parse_increment_iteration(i)
-
-        if idx == 0:
-            err_keys = [j for j in inc_iter_i.keys() if j.startswith("error_")]
-            converge_errors = dict(
-                zip(
-                    err_keys, [{"value": [], "tol": [], "relative": []} for _ in err_keys]
-                )
+    pk_arrs = []
+    dg_arrs = []
+    for inc_dat in stdout_dat["increments"]:
+        for mech_iter in inc_dat["mechanical_iterations"]:
+            dg_arr_idx = len(dg_arrs)
+            pk_arr_idx = len(pk_arrs)
+            mech_iter["deformation_gradient_aim_idx"] = dg_arr_idx
+            mech_iter["piola_kirchhoff_stress_idx"] = list(
+                range(pk_arr_idx, pk_arr_idx + len(mech_iter["piola_kirchhoff_stress"]))
             )
+            dg_arrs.append(mech_iter.pop("deformation_gradient_aim"))
+            pk_arrs.extend(mech_iter.pop("piola_kirchhoff_stress"))
 
-        dg_arr.append(inc_iter_i["deformation_gradient_aim"])
-        pk_arr.append(inc_iter_i["piola_kirchhoff_stress"])
+    stdout_dat["deformation_gradient_aim"] = np.array(dg_arrs)
+    stdout_dat["piola_kirchhoff_stress"] = np.array(pk_arrs)
 
-        for j in err_keys:
-            for k in ["value", "tol", "relative"]:
-                converge_errors[j][k].append(inc_iter_i[j][k])
 
-    dg_arr = np.array(dg_arr)
-    pk_arr = np.array(pk_arr)
-    for j in err_keys:
-        for k in ["value", "tol", "relative"]:
-            converge_errors[j][k] = np.array(converge_errors[j][k])
+def split_stdout_arrays(stdout_dat: dict[str, Any]) -> None:
+    """Split the arrays concatenated in `concat_stdout_arrays` back into lists of arrays
+    corresponding to each increment and iteration.
 
-    parsed_inc = {
-        "converged": True,
-        "inc_number": inc_number,
-        "inc_time": inc_time,
-        "inc_cut_back": inc_cut_back,
-        "inc_load_case": inc_load_case,
-        "deformation_gradient_aim": dg_arr,
-        "piola_kirchhoff_stress": pk_arr,
-        "num_iters": num_iters,
-        **converge_errors,
-    }
-
-    return parsed_inc
+    """
+    for inc_dat in stdout_dat["increments"]:
+        for mech_iter in inc_dat["mechanical_iterations"]:
+            dg_arr_idx = mech_iter.pop("deformation_gradient_aim_idx")
+            pk_arr_idxs = mech_iter.pop("piola_kirchhoff_stress_idx")
+            mech_iter["deformation_gradient_aim"] = stdout_dat[
+                "deformation_gradient_aim"
+            ][dg_arr_idx]
+            mech_iter["piola_kirchhoff_stress"] = [
+                stdout_dat["piola_kirchhoff_stress"][i] for i in pk_arr_idxs
+            ]
+    del stdout_dat["piola_kirchhoff_stress"]
+    del stdout_dat["deformation_gradient_aim"]
 
 
 def read_geom(geom_path):
@@ -198,92 +335,6 @@ def read_geom(geom_path):
     }
 
     return geometry
-
-
-def read_spectral_stdout(path, encoding="utf8"):
-    path = Path(path)
-    inc_split_str = r"\s#{75}"
-    inc_pattern = re.compile(r"Time.*Increment\s+(\d+)\s*\/\s*\d+")
-
-    with path.open("r", encoding=encoding) as handle:
-        lines = handle.read()
-
-        cut_back_split = re.split(inc_split_str, lines)[1:]
-
-        # we split on the "cut back" delimiter really, not the increment delimiter, so
-        # join together items that are actually the same increment:
-        # extract increment indices:
-        inc_indices = []
-        for line in cut_back_split:
-            m = inc_pattern.search(line)
-            if m:
-                inc_indices.append(int(m.group(1)))
-
-        # group by the same increment index:
-        groups = defaultdict(str)
-        for idx, s in zip(inc_indices, cut_back_split):
-            groups[idx] += s
-        inc_split = list(groups.values())
-
-        dg_arr = []
-        pk_arr = []
-        inc_idx = []
-        inc_pos_dat = {
-            "inc_number": [],
-            "inc_time": [],
-            "inc_cut_back": [],
-            "inc_load_case": [],
-        }
-        err_keys = None
-        converge_errors = None
-        warnings = []
-
-        for idx, i in enumerate(inc_split):
-
-            parsed_inc = parse_increment(i)
-            if parsed_inc["converged"]:
-
-                inc_idx.extend([idx] * parsed_inc["num_iters"])
-                if idx == 0:
-                    err_keys = [j for j in parsed_inc.keys() if j.startswith("error_")]
-                    converge_errors = dict(
-                        zip(
-                            err_keys,
-                            [{"value": [], "tol": [], "relative": []} for _ in err_keys],
-                        )
-                    )
-                dg_arr.extend(parsed_inc.pop("deformation_gradient_aim"))
-                pk_arr.extend(parsed_inc.pop("piola_kirchhoff_stress"))
-                for j in err_keys:
-                    for k in ["value", "tol", "relative"]:
-                        converge_errors[j][k].extend(parsed_inc[j][k])
-
-                for k in ["inc_number", "inc_time", "inc_cut_back", "inc_load_case"]:
-                    inc_pos_dat[k].append(parsed_inc[k])
-
-            else:
-                warnings.extend(parsed_inc["warnings"])
-
-        inc_idx = np.array(inc_idx)
-        dg_arr = np.array(dg_arr)
-        pk_arr = np.array(pk_arr)
-        for j in err_keys:
-            for k in ["value", "tol", "relative"]:
-                converge_errors[j][k] = np.array(converge_errors[j][k])
-
-        for k in ["inc_number", "inc_time", "inc_cut_back", "inc_load_case"]:
-            inc_pos_dat[k] = np.array(inc_pos_dat[k])
-
-        out = {
-            "deformation_gradient_aim": dg_arr,
-            "piola_kirchhoff_stress": pk_arr,
-            "increment_idx": inc_idx,
-            "warnings": warnings,
-            **converge_errors,
-            **inc_pos_dat,
-        }
-
-    return out
 
 
 def read_spectral_stderr(path):

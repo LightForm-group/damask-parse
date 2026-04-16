@@ -6,7 +6,6 @@ from pathlib import Path
 from subprocess import run, PIPE
 import copy
 import re
-import sys
 
 import numpy as np
 import h5py
@@ -2051,3 +2050,32 @@ def generate_viz(hdf5_path, viz_spec, parsed_outs, parallel=True):
                     result.export_VTK(
                         output=outputs, parallel=parallel
                     )  # known: v3 alpha 7
+
+
+def nested_dicts_equal(d1, d2, rtol=1e-5, atol=1e-8):
+    """Check if two nested dicts are equal, including float numpy array values."""
+    if type(d1) != type(d2):
+        return False
+
+    if isinstance(d1, dict):
+        if d1.keys() != d2.keys():
+            print(
+                f"key diff!: {set(d1.keys()) - set(d2.keys())} and {set(d2.keys()) - set(d1.keys())}"
+            )
+            return False
+        return all(nested_dicts_equal(d1[k], d2[k], rtol, atol) for k in d1)
+
+    if isinstance(d1, (list, tuple)):
+        if len(d1) != len(d2):
+            return False
+        return all(nested_dicts_equal(a, b, rtol, atol) for a, b in zip(d1, d2))
+
+    if isinstance(d1, np.ndarray):
+        return d1.shape == d2.shape and np.allclose(d1, d2, rtol=rtol, atol=atol)
+
+    if isinstance(d1, float):
+        return bool(np.isclose(d1, d2, rtol=rtol, atol=atol))
+
+    return d1 == d2
+
+

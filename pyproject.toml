@@ -8,6 +8,7 @@ authors = [
     "Guy Bowker",
     "Gerard Capes"
 ]
+include = ["tests/data/**/*"]
 license = "MPL 2.0"
 readme = "README.md"
 classifiers = [
@@ -17,7 +18,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.14"
+python = ">=3.10,<3.14"
 numpy = [
     {version = "^1.24.4", python = "<3.9"},
     {version = ">=1.26.4", python = ">=3.9,<3.13"},
@@ -31,13 +32,14 @@ scipy = [
 pandas = "^2.0.3"
 h5py = "^3.11.0"
 damask = "^3.0.0"
-"ruamel.yaml" = "^0.18.6"
+ruamel-yaml = "^0.18.17"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.6.9"
-commitizen = "2.20.3"
-pre-commit = "2.16.0"
-ipykernel = "^6.29.5"
+commitizen = ">=2.20.3,<5.0.0"
+pre-commit = ">=2.16,<5.0"
+ipykernel = "^7.2.0"
+pytest = "^9.0.3"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
