@@ -1,4 +1,12 @@
 
+<a name="v0.6.1"></a>
+## [v0.6.1](https://github.com/LightForm-group/damask-parse/compare/v0.6.0...v0.6.1) - 2026.04.16
+
+### 🐛 Bug Fixes
+
+* more robust stdout parsing
+
+
 <a name="v0.6.0"></a>
 ## [v0.6.0](https://github.com/LightForm-group/damask-parse/compare/v0.5.1...v0.6.0) - 2026.03.11
 
